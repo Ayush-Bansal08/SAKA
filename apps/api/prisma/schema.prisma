@@ -1,0 +1,704 @@
+// Warden database schema — the full model set for all phases (PHASE_01 §3).
+// Money: USD values are Decimal; raw token amounts are strings (uint256 does not fit BIGINT).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum ProviderKind {
+  dev
+  world
+}
+
+enum RiskProfile {
+  CAREFUL
+  BALANCED
+  ADVENTUROUS
+}
+
+enum OnboardingStep {
+  VERIFY
+  WALLET
+  PROFILE
+  FUND
+  DONE
+}
+
+enum HookPolicy {
+  SAFE_ONLY
+  SAFE_AND_CAUTION
+}
+
+enum ChatRole {
+  USER
+  AGENT
+  SYSTEM
+}
+
+enum RequestChannel {
+  WEB
+  TELEGRAM
+  DETECTOR
+  TRIGGER
+}
+
+enum AgentRequestStatus {
+  RECEIVED
+  PLANNING
+  PREPARED
+  AWAITING_APPROVAL
+  QUEUED
+  EXECUTING
+  DONE
+  REFUSED
+  FAILED
+  CANCELLED
+}
+
+enum InferenceRole {
+  PLANNER
+  GUARD
+  EXPLAINER
+}
+
+enum PolicyOutcome {
+  AUTO
+  STEP_UP
+  REFUSE
+  ASK
+}
+
+enum ActionPlanStatus {
+  PREPARED
+  AWAITING_APPROVAL
+  APPROVED
+  QUEUED
+  EXECUTING
+  EXECUTED
+  REFUSED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+  USED
+  REJECTED
+}
+
+enum ApprovalChannel {
+  WEB
+  TELEGRAM
+}
+
+enum IdentityPurpose {
+  SIGN_IN
+  ENROLL
+  STEP_UP
+}
+
+enum IdentityAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum ExecutionKind {
+  APPROVAL
+  PERMIT_SIGN
+  SWAP
+  TRANSFER
+  LP_CREATE
+  LP_DECREASE
+  LP_CLAIM
+}
+
+enum ExecutionStatus {
+  PENDING
+  SIGNED
+  BROADCAST
+  CONFIRMED
+  FAILED
+  REVERTED
+}
+
+enum ApprovedBy {
+  AGENT
+  HUMAN
+}
+
+enum DecisionLogStatus {
+  PENDING
+  UPLOADED
+  FAILED
+}
+
+enum LpProtocol {
+  V4
+  V3
+}
+
+enum LpPositionStatus {
+  OPEN
+  CLOSED
+}
+
+enum TokenLotSource {
+  DEPOSIT
+  SWAP
+  LP_EXIT
+}
+
+enum TriggerKind {
+  TAKE_PROFIT
+  STOP_LOSS
+  DCA
+  CHAINED
+  PRICE_ALERT
+}
+
+enum TriggerStatus {
+  ACTIVE
+  FIRED
+  CANCELLED
+  FAILED
+}
+
+enum SuggestionDetector {
+  DIP
+  PROFIT
+  IDLE_USDC
+  BETTER_POOL
+  OUT_OF_RANGE
+  NEW_HOOK
+  HOOK_CHANGED
+  BIG_MOVE
+  MORNING_BRIEF
+}
+
+enum SuggestionSeverity {
+  INFO
+  NORMAL
+  RED
+}
+
+enum SuggestionStatus {
+  OPEN
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  AUTO_EXECUTED
+  INFO
+}
+
+enum HookBand {
+  SAFE
+  CAUTION
+  DANGER
+}
+
+enum TraceKind {
+  system
+  plan
+  tool_call
+  tool_result
+  score
+  simulation
+  guard
+  policy
+  approval
+  tx
+  receipt
+  log
+  error
+  detector
+}
+
+// ---------------------------------------------------------------------------
+// Identity & sessions
+// ---------------------------------------------------------------------------
+
+/// One verified human = one agent: (identityIss, identitySub) is unique.
+model User {
+  id             String         @id @default(cuid())
+  identityIss    String
+  identitySub    String
+  identityKind   ProviderKind
+  verifiedAt     DateTime?
+  lastAuthAt     DateTime?
+  displayName    String?
+  timezone       String         @default("Asia/Kolkata")
+  riskProfile    RiskProfile    @default(BALANCED)
+  onboardingStep OnboardingStep @default(VERIFY)
+  telegramChatId String?        @unique
+  telegramMuted  Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  sessions         Session[]
+  wallet           AgentWallet?
+  limits           Limits?
+  knownRecipients  KnownRecipient[]
+  chatMessages     ChatMessage[]
+  agentRequests    AgentRequest[]
+  actionPlans      ActionPlan[]
+  approvals        Approval[]
+  identityAttempts IdentityAttempt[]
+  executions       Execution[]
+  lpPositions      LpPosition[]
+  tokenLots        TokenLot[]
+  triggers         Trigger[]
+  suggestions      Suggestion[]
+  traceEvents      TraceEventRow[]
+
+  @@unique([identityIss, identitySub])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  /// sha256 (hex) of the opaque bearer token — the token itself is never stored.
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model IdentityAttempt {
+  id              String                @id @default(cuid())
+  userId          String?
+  approvalId      String?
+  purpose         IdentityPurpose
+  state           String                @unique
+  nonce           String
+  /// AES-256-GCM ciphertext (ENCRYPTION_KEY) — never store PKCE verifiers in clear.
+  pkceVerifierEnc String
+  deviceCodeEnc   String?
+  userCode        String?
+  verificationUri String?
+  status          IdentityAttemptStatus @default(PENDING)
+  expiresAt       DateTime
+  error           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approval Approval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([approvalId])
+  @@index([status, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Wallet & limits
+// ---------------------------------------------------------------------------
+
+model AgentWallet {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  privyWalletId String   @unique
+  address       String   @unique
+  chainId       Int
+  policyId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Limits {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  perActionUsd      Decimal    @db.Decimal(20, 2)
+  perDayUsd         Decimal    @db.Decimal(20, 2)
+  maxSlippagePct    Decimal    @db.Decimal(6, 3)
+  minTradeScoreAuto Int
+  hookPolicy        HookPolicy
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model KnownRecipient {
+  id        String   @id @default(cuid())
+  userId    String
+  address   String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, address])
+}
+
+// ---------------------------------------------------------------------------
+// Agent pipeline
+// ---------------------------------------------------------------------------
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      ChatRole
+  text      String
+  cards     Json?
+  traceId   String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([traceId])
+}
+
+model AgentRequest {
+  id        String             @id @default(cuid())
+  userId    String
+  channel   RequestChannel
+  input     Json
+  status    AgentRequestStatus @default(RECEIVED)
+  traceId   String
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inferences  Inference[]
+  actionPlans ActionPlan[]
+
+  @@index([userId, createdAt])
+  @@index([traceId])
+  @@index([status])
+}
+
+/// Every 0G model call, with its request IDs and provenance (0G track requirement).
+model Inference {
+  id               String        @id @default(cuid())
+  agentRequestId   String?
+  role             InferenceRole
+  model            String
+  trustMode        String
+  zgRequestId      String?
+  clientRequestId  String        @unique
+  providerAddress  String?
+  providerIdentity String?
+  teeVerified      Boolean?
+  trace            Json?
+  latencyMs        Int
+  inputTokens      Int?
+  outputTokens     Int?
+  costRaw          String?
+  ok               Boolean
+  error            String?
+  createdAt        DateTime      @default(now())
+
+  agentRequest AgentRequest? @relation(fields: [agentRequestId], references: [id], onDelete: SetNull)
+
+  @@index([agentRequestId])
+  @@index([zgRequestId])
+  @@index([createdAt])
+}
+
+model ActionPlan {
+  id             String           @id @default(cuid())
+  agentRequestId String
+  userId         String
+  intent         Json
+  /// sha256 of canonical JSON of intent + amounts + recipient + chain.
+  planHash       String
+  steps          Json
+  quote          Json?
+  amountUsd      Decimal          @db.Decimal(24, 8)
+  tradeScore     Int?
+  hookScore      Int?
+  hookAddress    String?
+  simulation     Json?
+  guardVerdict   Json?
+  policyOutcome  PolicyOutcome
+  policyReasons  Json
+  status         ActionPlanStatus @default(PREPARED)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  agentRequest AgentRequest @relation(fields: [agentRequestId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approval     Approval?
+  executions   Execution[]
+  decisionLog  DecisionLog?
+  suggestions  Suggestion[]
+
+  @@index([agentRequestId])
+  @@index([userId, createdAt])
+  @@index([planHash])
+  @@index([status])
+}
+
+model Approval {
+  id            String          @id @default(cuid())
+  actionPlanId  String          @unique
+  userId        String
+  planHash      String
+  amountUsd     Decimal         @db.Decimal(24, 8)
+  /// Why a step-up is required, in plain English.
+  reason        String
+  status        ApprovalStatus  @default(PENDING)
+  channel       ApprovalChannel
+  expiresAt     DateTime
+  resolvedAt    DateTime?
+  approvedByIss String?
+  approvedBySub String?
+  authTime      DateTime?
+  acr           String?
+  amr           Json?
+  providerKind  ProviderKind
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  actionPlan       ActionPlan        @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityAttempts IdentityAttempt[]
+
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model Execution {
+  id                String          @id @default(cuid())
+  actionPlanId      String
+  userId            String
+  stepIndex         Int
+  idempotencyKey    String          @unique
+  kind              ExecutionKind
+  txHash            String?         @unique
+  nonce             Int?
+  status            ExecutionStatus @default(PENDING)
+  usdValue          Decimal         @db.Decimal(24, 8)
+  gasUsed           String?
+  effectiveGasPrice String?
+  blockNumber       String?
+  error             String?
+  approvedBy        ApprovedBy
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([actionPlanId, stepIndex])
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+/// Tamper-proof decision record uploaded to 0G Storage.
+model DecisionLog {
+  id           String            @id @default(cuid())
+  actionPlanId String            @unique
+  payload      Json
+  payloadHash  String
+  zgRootHash   String?
+  zgTxHash     String?
+  status       DecisionLogStatus @default(PENDING)
+  attempts     Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  actionPlan ActionPlan @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio
+// ---------------------------------------------------------------------------
+
+model LpPosition {
+  id           String           @id @default(cuid())
+  userId       String
+  chainId      Int
+  protocol     LpProtocol
+  /// uint256 position NFT id, stored as a decimal string.
+  tokenId      String
+  poolId       String
+  token0       String
+  token1       String
+  hookAddress  String?
+  tickLower    Int
+  tickUpper    Int
+  status       LpPositionStatus @default(OPEN)
+  openedTxHash String
+  costBasisUsd Decimal          @db.Decimal(24, 8)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chainId, protocol, tokenId])
+  @@index([userId, createdAt])
+  @@index([poolId])
+}
+
+/// FIFO cost lots for P&L.
+model TokenLot {
+  id           String         @id @default(cuid())
+  userId       String
+  tokenAddress String
+  /// Raw token units (uint256) as a decimal string.
+  amountRaw    String
+  costUsd      Decimal        @db.Decimal(24, 8)
+  source       TokenLotSource
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tokenAddress, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Mode B
+// ---------------------------------------------------------------------------
+
+model Trigger {
+  id          String        @id @default(cuid())
+  userId      String
+  kind        TriggerKind
+  spec        Json
+  status      TriggerStatus @default(ACTIVE)
+  nextRunAt   DateTime?
+  lastFiredAt DateTime?
+  fireCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, nextRunAt])
+}
+
+model Suggestion {
+  id                String             @id @default(cuid())
+  userId            String
+  detector          SuggestionDetector
+  dedupeKey         String
+  severity          SuggestionSeverity
+  message           String
+  actionPlanId      String?
+  status            SuggestionStatus   @default(OPEN)
+  telegramMessageId String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionPlan ActionPlan? @relation(fields: [actionPlanId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([actionPlanId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Hooks (explorer)
+// ---------------------------------------------------------------------------
+
+model Hook {
+  id                     String    @id @default(cuid())
+  chainId                Int
+  address                String
+  flags                  Json
+  permissions            Json
+  isProxy                Boolean
+  implementation         String?
+  owner                  String?
+  verifiedSource         Boolean?
+  codeHash               String
+  score                  Int
+  band                   HookBand
+  scoreBreakdown         Json
+  explanation            String?
+  explanationInferenceId String?
+  firstSeenAt            DateTime  @default(now())
+  lastSnapshot           Json
+  lastCheckedAt          DateTime
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([chainId, address])
+  @@index([band])
+}
+
+model HookPool {
+  id             String   @id @default(cuid())
+  chainId        Int
+  poolId         String
+  hookAddress    String
+  token0         String
+  token1         String
+  fee            Int
+  tickSpacing    Int
+  tvlUsd         Decimal? @db.Decimal(24, 2)
+  createdAtBlock BigInt?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([chainId, poolId])
+  @@index([chainId, hookAddress])
+  @@index([chainId, token0, token1])
+}
+
+// ---------------------------------------------------------------------------
+// Infra
+// ---------------------------------------------------------------------------
+
+model PriceCache {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  fetchedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Persistent mirror of the TraceEvent stream (packages/shared/src/trace.ts).
+model TraceEventRow {
+  id      String    @id
+  traceId String
+  userId  String
+  ts      DateTime
+  kind    TraceKind
+  title   String
+  detail  String?
+  data    Json?
+  zg      Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([traceId])
+  @@index([userId, ts])
+}

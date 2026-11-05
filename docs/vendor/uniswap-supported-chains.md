@@ -1,0 +1,144 @@
+# Supported Chains & Tokens (/docs/trading/swapping-api/supported-chains)
+
+Chains and tokens supported by the Uniswap API, including UniswapX chain support.
+
+## Supported Chains for Swapping
+The following chains are supported for swapping. **Note the router address, which you may need to whitelist for your wallet(s)/application**.
+
+For the avoidance of any doubt, the most up to date list of routers is available in GitHub [here](https://github.com/Uniswap/sdks/blob/main/sdks/universal-router-sdk/src/utils/constants.ts).
+
+Support for Universal Router 2.0 and 2.1.1 ends on October 21, 2026. See [Sunset of Universal Router 2.0 and 2.1.1](/docs/changelog/active-notifications/sunset-of-universal-router-2-0-and-2-1-1).
+
+| Chain ID     | Chain Name                 | Universal Router 2.1.2 Address             | UniswapX Support |
+| :----------- | :------------------------- | :----------------------------------------- | :--------------- |
+| 1            | Mainnet (Ethereum)         | 0x23617e59A5925b2A4Bf75d73ff6711cD0b29De85 | Yes              |
+| 10           | OP Mainnet                 | 0xC09255D86DB563cBc11C2fCf4a0C512e160111B4 |                  |
+| 56           | BNB Smart Chain            | 0xDc264714F68d84CF29BC605589405E78bDBE7C9f | Yes              |
+| 130          | Unichain                   | 0xD1b797D92d87B688193A2B976eFc8D577D204343 | Yes              |
+| 137          | Polygon                    | 0xDc264714F68d84CF29BC605589405E78bDBE7C9f |                  |
+| 143          | Monad                      | 0xa6CE4F10d83dBdDAc17E68e1837ca9cE6a1b596e | Yes              |
+| 196          | X Layer                    | 0x1cd182C94fcF42277B80DBB9060F88024809E61E |                  |
+| 324          | zkSync                     | (See note below)                           |                  |
+| 480          | World Chain                | 0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f |                  |
+| 1868         | Soneium                    | 0x661E93cca42AfacB172121EF892830cA3b70F08d |                  |
+| 4217         | Tempo                      | 0x182a927119D56008d921126764bF884221b10f59 | Yes              |
+| 4326         | MegaETH                    | 0xAedd1CF4C14e833140A61E9C0d2b73a64795c823 |                  |
+| 4663         | Robinhood Chain            | 0x204FAca1764B154221e35c0d20aBb3c525710498 | Yes              |
+| 5042         | Arc                        | 0x8702463e73f74d0b6765aBceb314Ef07aCb92650 | Yes              |
+| 8453         | Base                       | 0xd6145b2D3F379919E8CdEda7B97e37c4b2Ca9c40 | Yes              |
+| 42161        | Arbitrum                   | 0x2d01411773c8C24805306E89A41F7855C3c4Fe65 | Yes              |
+| 42220        | Celo                       | 0xe2023F3FA515cF070e07fD9d51c1d236e07843f4 |                  |
+| 43114        | Avalanche                  | 0x661E93cca42AfacB172121EF892830cA3b70F08d | Yes              |
+| 57073        | Ink                        | 0x661E93cca42AfacB172121EF892830cA3b70F08d | Yes              |
+| 59144        | Linea                      | 0xDc264714F68d84CF29BC605589405E78bDBE7C9f |                  |
+| 7777777      | Zora                       | 0xF025e0Fe9E331A0eF05c2ad3C4E9C64b625cda6f |                  |
+| **Testnets** |                            |                                            |                  |
+| 1301         | Unichain Sepolia (Testnet) | 0xDf38F24fE153761634Be942F9d859f3DBA857E95 |                  |
+| 84532        | Base Sepolia (Testnet)     | 0x8702463e73f74d0b6765aBceb314Ef07aCb92650 |                  |
+| 11155111     | Ethereum Sepolia (Testnet) | 0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3 |                  |
+
+> [!NOTE]
+> **Testnet Availability**
+>
+> Only Ethereum Sepolia and Unichain Sepolia are available as testnets on the [Uniswap web interface](https://app.uniswap.org). All listed testnets above are accessible via the API.
+
+## Universal Router version
+The Trading API builds swap calldata for a specific Universal Router version. Select the version with the `x-universal-router-version` request header, accepted on `/quote`, `/swap`, `/swap_5792`, and `/swap_7702`.
+
+## Default version
+When you do not send the `x-universal-router-version` header, the API defaults to Universal Router `2.1.2` on every chain that has a 2.1.2 deployment. zkSync has no 2.1.2 and runs `2.0` only. zkSync's 2.0 Universal Router address is `0x28731BCC616B5f51dD52CF2e4dF0E78dD1136C06`.
+
+You can always set the header explicitly. Requesting a version a chain does not support returns an error, for example `2.0` on Robinhood Chain and Arc, neither of which has a `2.0` deployment.
+
+The table above lists the 2.1.2 address for each chain. **The default can change over time, so set the header explicitly when you need a stable target.**
+
+## SDK compatibility for decoding calldata
+> [!NOTE]
+> **Keep your Universal Router SDK in sync with the router version**
+>
+> If you decode the calldata the API returns with the [Universal Router SDK](https://github.com/Uniswap/sdks/tree/main/sdks/universal-router-sdk), your `@uniswap/universal-router-sdk` version must support the Universal Router version used for the request, and you must pass the matching `UniversalRouterVersion` to `CommandParser.parseCalldata`. Decoding with an older version, or without the version argument, can fail or produce incomplete results. If you submit the returned calldata onchain and never decode it yourself, only the header matters.
+
+Use at least the SDK version that introduced support for the router version you decode, and pass its `UniversalRouterVersion` member to the parser:
+
+| Universal Router version | `UniversalRouterVersion` | Minimum `@uniswap/universal-router-sdk` |
+| :----------------------- | :----------------------- | :-------------------------------------- |
+| 2.0                      | `V2_0`                   | 3.1.0                                   |
+| 2.1.1                    | `V2_1_1`                 | 5.9.0                                   |
+| 2.1.2                    | `V2_1_2`                 | 5.12.0                                  |
+| 2.2.0                    | `V2_2_0`                 | 5.12.0                                  |
+
+Versions 5.12.0 and later are the first to resolve 2.1.2, and the first to carry the current 2.2.0 addresses. Earlier releases resolve 2.2.0 to a deployment that was replaced, so do not use them for that version.
+
+From 2.1.1 onward, the V2 and V3 swap commands carry an extra `minHopPriceX36` per-hop slippage array, and the v4 swap actions have the same field. SDK 5.9.0 is the first release whose parser decodes that array and the first whose `parseCalldata` accepts a `UniversalRouterVersion` argument, which defaults to `V2_0`. Older SDKs may parse newer calldata without an error but drop `minHopPriceX36`, so your validation can be incomplete even when it appears to succeed.
+
+```typescript
+import { CommandParser, UniversalRouterVersion } from '@uniswap/universal-router-sdk'
+
+// `calldata` is the value returned by the /swap response.
+// The version you pass must match the x-universal-router-version header you sent.
+
+// Defaults to V2_0. On 2.1.1 and later calldata the per-hop slippage array is
+// silently dropped, and on SDK < 5.9.0 there is no version argument to fix it.
+const parsedWrong = CommandParser.parseCalldata(calldata)
+
+// SDK >= 5.12.0: pass the matching version so 2.1.2 calldata decodes fully.
+const parsed = CommandParser.parseCalldata(calldata, UniversalRouterVersion.V2_1_2)
+```
+
+Track the [SDK releases](https://github.com/Uniswap/sdks/releases) so your decoder stays compatible when the router version changes. The current mapping lives in the SDK [constants file](https://github.com/Uniswap/sdks/blob/main/sdks/universal-router-sdk/src/utils/constants.ts).
+
+## UniswapX Chain Support
+UniswapX is available on the following chains:
+
+| Protocol    | Supported Chains                                                                                                                                                   |
+| :---------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UniswapX V2 | Mainnet (1), Arbitrum (42161), Base (8453)                                                                                                                         |
+| UniswapX V3 | Arbitrum (42161), Arc (5042), Avalanche (43114), Base (8453), BNB Smart Chain (56), Ink (57073), Monad (143), Robinhood Chain (4663), Tempo (4217), Unichain (130) |
+
+If you submit a quote request with `protocols` set to `UNISWAPX_V2` or `UNISWAPX_V3` on a chain not listed above, the request will fail.
+
+Most integrators do not need to set `protocols`. With the default `BEST_PRICE` routing preference, the API considers UniswapX alongside the Uniswap Protocol and selects the most efficient route based on current inputs. Set `protocols` only to narrow routing to a specific protocol or UniswapX version. See [AMM vs UniswapX routing](/docs/trading/swapping-api/amm-vs-uniswapx-routing) for details.
+
+> [!NOTE]
+> **UniswapX Minimum Quote Values**
+>
+> All UniswapX quote requests must meet a per-chain minimum swap value. Below that, UniswapX is included only when its quote improves on the AMM route by at least 0.2%.
+> 
+>   Requests that meet neither condition return a 404 with `errorCode: QuoteAmountTooLowError` (see [Troubleshooting](/docs/trading/swapping-api/common-errors#404-no-quotes-available)). This is the most common cause of failed UniswapX quote requests.
+
+## How Do I Swap Native Tokens?
+To swap native tokens, use the address `0x0000000000000000000000000000000000000000`.
+
+If the native token is the input token and you want the quote request to consider UniswapX routes, set the optional `x-erc20eth-enabled` header to `true` on the `/quote` request. This enables native ETH input support for UniswapX via ERC20-ETH (EIP-7914) on supported wallets and chains. Use the same header when submitting the resulting UniswapX order to `/order`.
+
+```bash
+curl -X POST https://trade-api.gateway.uniswap.org/v1/quote \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "x-erc20eth-enabled: true" \
+  -d '{
+    "tokenIn": "0x0000000000000000000000000000000000000000",
+    "tokenOut": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "tokenInChainId": 1,
+    "tokenOutChainId": 1,
+    "amount": "1000000000000000000",
+    "type": "EXACT_INPUT",
+    "swapper": "0x..."
+  }'
+```
+
+## Supported Tokens for Swapping
+Generally any two tokens on any supported chain can be swapped. However, Uniswap Labs maintains a list of "unsupported" tokens, for which we do not permit swapping through any method due to legal or regulatory restrictions. Those tokens and their chains are available here: [https://unsupportedtokens.uniswap.org/](https://unsupportedtokens.uniswap.org/). If one or both tokens in the swap pair are on the unsupported token list, no quote will be returned.
+
+Note that all tokens do not necessarily have regular or sufficient liquidity to perform a swap between any two tokens at any volume. We always recommend [submitting a quote](/docs/api-reference/aggregator_quote) request prior to performing a swap to confirm that there is an available route, or filler, to complete the swap and available liquidity.
+
+We recommend that end users always do their own due diligence before swapping any tokens.
+
+## Supported Tokens for Bridging
+To get a list of tokens which can be bridged, and the chains between which they can be bridged, make a request to the [swappable\_tokens endpoint](/docs/api-reference/get_swappable_tokens).
+
+## How Often Are New Tokens Added?
+As new tokens are created they are automatically detected and made available for swapping within minutes of creation. New tokens may not be immediately swappable as it is dependent on there being sufficient liquidity in a pool for swapping to take place.
+
+The [Verified tokens list](https://tokens.uniswap.org/) is updated periodically as new tokens are supported by major centralized exchanges.

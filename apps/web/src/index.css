@@ -1,0 +1,149 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+/*
+ * Warden design system — dark, calm, fintech-trustworthy.
+ * One source of truth for colors: semantic CSS variables below, exposed to
+ * Tailwind via @theme. Product colors: agent (violet), human (teal), safe,
+ * caution, danger, info, zg (0G verification accent).
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: dark;
+  --radius: 12px;
+
+  /* Surfaces */
+  --background: #090c10;
+  --foreground: #e7eaf0;
+  --card: #0f1318;
+  --card-foreground: #e7eaf0;
+  --surface-2: #151a21;
+  --surface-3: #1b212a;
+  --popover: #12171d;
+  --popover-foreground: #e7eaf0;
+  --border: #1e252e;
+  --border-strong: #2a323d;
+  --input: #232a34;
+  --ring: #8b7cf6;
+  --muted: #151a21;
+  --muted-foreground: #8a94a4;
+  --subtle-foreground: #5f6978;
+
+  /* shadcn roles */
+  --primary: #8b7cf6;
+  --primary-foreground: #0b0a14;
+  --secondary: #1b212a;
+  --secondary-foreground: #e7eaf0;
+  --accent: #1b212a;
+  --accent-foreground: #e7eaf0;
+  --destructive: #ef5350;
+  --destructive-foreground: #fff5f5;
+
+  /* Product semantics */
+  --agent: #8b7cf6;
+  --human: #2dd4bf;
+  --safe: #34d399;
+  --caution: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --zg: #f0abfc;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-agent: var(--agent);
+  --color-human: var(--human);
+  --color-safe: var(--safe);
+  --color-caution: var(--caution);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-zg: var(--zg);
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--agent) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Quiet, thin scrollbars that match the surfaces */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

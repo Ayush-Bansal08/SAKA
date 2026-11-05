@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+.env
+.env.*
+!.env.example
+docs
+# The web app is deployed to Vercel; only its manifest is needed for the lockfile.
+apps/web/src
+apps/web/public
