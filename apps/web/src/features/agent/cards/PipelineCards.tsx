@@ -203,7 +203,7 @@ export function ApprovalCardView({ card }: { card: ApprovalCard }) {
           <p
             className={cn(
               'flex items-center gap-1.5 text-xs tabular-nums',
-              left < 60 ? 'text-danger' : 'text-caution',
+              left < 60 ? 'text-danger' : 'text-warm',
             )}
             aria-live="polite"
           >
@@ -225,12 +225,11 @@ export function ApprovalCardView({ card }: { card: ApprovalCard }) {
               <Button
                 disabled={action.isPending}
                 onClick={() => action.mutate({ kind: 'dev-approve', approvalId: card.approvalId })}
-                className="bg-human text-background hover:bg-human/90"
               >
                 <Fingerprint aria-hidden /> Approve (dev)
               </Button>
             ) : (
-              <Button disabled className="bg-human text-background">
+              <Button disabled>
                 <Globe aria-hidden /> Approve with World ID
               </Button>
             )}

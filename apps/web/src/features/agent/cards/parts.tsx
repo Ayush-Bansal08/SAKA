@@ -33,16 +33,16 @@ import { scoreTone, shortRoute, usd } from './card-utils';
 export type CardTone = 'agent' | 'caution' | 'danger' | 'safe' | 'neutral' | 'info';
 
 const TONE_BORDER: Record<CardTone, string> = {
-  agent: 'border-agent/35 bg-agent/[0.035]',
-  caution: 'border-caution/40 bg-caution/[0.045]',
+  agent: 'border-agent/30 bg-agent/[0.04]',
+  caution: 'border-warm/40 bg-warm/[0.05]',
   danger: 'border-danger/40 bg-danger/[0.045]',
-  safe: 'border-safe/35 bg-safe/[0.045]',
+  safe: 'border-safe/30 bg-safe/[0.035]',
   neutral: 'border-border bg-background/40',
-  info: 'border-info/30 bg-info/[0.035]',
+  info: 'border-border bg-surface-2/40',
 };
 const TONE_TEXT: Record<CardTone, string> = {
   agent: 'text-agent',
-  caution: 'text-caution',
+  caution: 'text-warm',
   danger: 'text-danger',
   safe: 'text-safe',
   neutral: 'text-muted-foreground',
@@ -76,7 +76,7 @@ export function CardShell({
     <section
       aria-label={label}
       className={cn(
-        'mt-2.5 overflow-hidden rounded-lg border text-sm motion-safe:animate-in motion-safe:fade-in-0',
+        'surface-highlight mt-3 overflow-hidden rounded-lg border text-sm motion-safe:animate-in motion-safe:fade-in-0',
         TONE_BORDER[tone],
       )}
     >
@@ -85,17 +85,8 @@ export function CardShell({
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          {eyebrow && (
-            <p
-              className={cn(
-                'text-[10.5px] font-semibold tracking-[0.08em] uppercase',
-                TONE_TEXT[tone],
-              )}
-            >
-              {eyebrow}
-            </p>
-          )}
-          <h3 className="font-semibold leading-snug [overflow-wrap:anywhere]">{title}</h3>
+          {eyebrow && <p className={cn('micro-label', TONE_TEXT[tone])}>{eyebrow}</p>}
+          <h3 className="font-medium leading-snug [overflow-wrap:anywhere]">{title}</h3>
         </div>
         {badge}
       </header>
@@ -107,7 +98,7 @@ export function CardShell({
             <button
               type="button"
               onClick={() => drawer.open(planId)}
-              className="ml-auto inline-flex items-center gap-0.5 rounded text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="ml-auto inline-flex min-h-8 items-center gap-0.5 rounded-sm text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               Details <ChevronRight className="size-3.5" aria-hidden />
             </button>

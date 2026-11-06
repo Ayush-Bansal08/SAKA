@@ -8,13 +8,13 @@ import type { UserView } from '@warden/shared';
 import {
   ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
   Blocks,
-  Bot,
   Droplets,
   Loader2,
   PieChart,
-  SendHorizontal,
   ShieldCheck,
+  Sparkles,
   Target,
   Trophy,
 } from 'lucide-react';
@@ -29,8 +29,9 @@ import {
 } from 'react';
 import type * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { AgentBadge, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
+import { AgentBadge, CardIndex, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
 import { useTraceStream } from '@/features/trace/trace-context';
+import { Wordmark } from '@/layout/Logo';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { dayLabel } from './cards/card-utils';
@@ -93,18 +94,18 @@ function Bubble({ item, preparing }: { item: FoldedMessage; preparing: boolean }
     >
       {!mine && (
         <span
-          className="mt-0.5 mr-2 hidden size-7 shrink-0 items-center justify-center rounded-full border border-agent/30 bg-agent/10 text-agent sm:flex"
+          className="mt-0.5 mr-2.5 hidden size-7 shrink-0 items-center justify-center rounded-full border border-agent/30 bg-agent/10 text-agent sm:flex"
           aria-hidden
         >
-          <Bot className="size-3.5" />
+          <Sparkles className="size-3.5" />
         </span>
       )}
       <div
         className={cn(
           'min-w-0 text-sm leading-relaxed',
           mine
-            ? 'max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-primary-foreground'
-            : 'w-full max-w-[640px]',
+            ? 'max-w-[85%] rounded-xl rounded-br-sm bg-primary px-4 py-2.5 text-primary-foreground'
+            : 'w-full max-w-[680px]',
         )}
       >
         <p className={cn('whitespace-pre-wrap [overflow-wrap:anywhere]', !mine && 'pt-0.5')}>
@@ -113,7 +114,7 @@ function Bubble({ item, preparing }: { item: FoldedMessage; preparing: boolean }
         {!mine && <PlanCards cards={item.cards} preparing={preparing} />}
         <p
           className={cn(
-            'mt-1.5 flex flex-wrap items-center gap-2 text-[11px]',
+            'mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px]',
             mine ? 'justify-end text-primary-foreground/70' : 'text-subtle-foreground',
           )}
         >
@@ -137,7 +138,7 @@ function useThinkingStep(traceId: string | null): string | null {
   }, [events, traceId]);
 }
 
-export function AgentPanel({ user }: { user: UserView }) {
+export function AgentPanel({ user, actions }: { user: UserView; actions?: React.ReactNode }) {
   const messagesQuery = useAgentMessages();
   const send = useSendAgentMessage();
   const [text, setText] = useState('');
@@ -264,6 +265,8 @@ export function AgentPanel({ user }: { user: UserView }) {
   let lastDay = '';
   const visible = folded.filter((f) => !f.hidden);
   const now = new Date();
+  // Nothing said yet: the prompt box moves to the centre, under the greeting.
+  const welcoming = !messagesQuery.isPending && visible.length === 0 && !optimistic;
 
   return (
     <ComposerContext.Provider value={composer}>
@@ -271,15 +274,28 @@ export function AgentPanel({ user }: { user: UserView }) {
         id="agent"
         title="Agent"
         subtitle="Plans on 0G · builds on Uniswap · you stay in control"
-        icon={<Bot />}
-        actions={<AgentBadge>{planning ? 'Thinking' : 'Ready'}</AgentBadge>}
-        className="min-h-[520px]"
-        bodyClassName="relative flex min-h-0 flex-col p-0"
+        icon={<Sparkles className={cn('text-agent', planning && 'agent-breathe')} />}
+        actions={
+          <>
+            {actions}
+            <AgentBadge icon={<Sparkles aria-hidden />}>
+              {planning ? 'Thinking' : 'Ready'}
+            </AgentBadge>
+          </>
+        }
+        className="h-full min-h-0"
+        bodyClassName={cn(
+          'relative flex min-h-0 flex-col overflow-y-auto p-0',
+          welcoming && 'justify-center',
+        )}
       >
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4"
+          className={cn(
+            'min-h-0 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5',
+            welcoming ? 'flex-none' : 'flex-1',
+          )}
         >
           {messagesQuery.isPending ? (
             <SkeletonRows rows={4} label="Loading your conversation" />
@@ -291,9 +307,9 @@ export function AgentPanel({ user }: { user: UserView }) {
               retrying={messagesQuery.isFetching}
             />
           ) : visible.length === 0 && !optimistic ? (
-            <Welcome name={user.displayName} onPick={composer.prefill} />
+            <Welcome name={user.displayName} />
           ) : (
-            <ol className="flex flex-col gap-4" aria-label="Conversation">
+            <ol className="mx-auto flex w-full max-w-3xl flex-col gap-5" aria-label="Conversation">
               {visible.map((item, idx) => {
                 const day = dayLabel(item.message.createdAt, now);
                 const sep = day !== lastDay;
@@ -306,7 +322,7 @@ export function AgentPanel({ user }: { user: UserView }) {
               })}
               {optimistic && (
                 <li className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/80 px-3.5 py-2 text-sm text-primary-foreground">
+                  <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary/80 px-4 py-2.5 text-sm text-primary-foreground">
                     <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
                       {optimistic.text}
                     </p>
@@ -318,15 +334,7 @@ export function AgentPanel({ user }: { user: UserView }) {
               )}
               {planning && (
                 <li className="flex items-center gap-2 pl-0 sm:pl-9" aria-live="polite">
-                  <span className="flex gap-1" aria-hidden>
-                    {[0, 1, 2].map((i) => (
-                      <span
-                        key={i}
-                        className="size-1.5 rounded-full bg-agent motion-safe:animate-bounce"
-                        style={{ animationDelay: `${i * 120}ms` }}
-                      />
-                    ))}
-                  </span>
+                  <Sparkles className="agent-breathe size-4 text-agent" aria-hidden />
                   <span className="text-xs text-muted-foreground">
                     Agent is thinking…
                     {step && <span className="text-foreground/80"> · {step}</span>}
@@ -341,36 +349,22 @@ export function AgentPanel({ user }: { user: UserView }) {
           <button
             type="button"
             onClick={() => scrollToEnd(true)}
-            className="absolute bottom-[132px] left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-agent/40 bg-card px-3 py-1.5 text-xs font-medium text-agent shadow-lg shadow-black/40 hover:bg-surface-2"
+            className="absolute bottom-[132px] left-1/2 z-10 inline-flex min-h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-agent/40 bg-card px-3 py-1.5 text-xs font-medium text-agent hover:bg-surface-2"
           >
             <ArrowDown className="size-3.5" aria-hidden /> New messages
           </button>
         )}
 
-        <div className="border-t border-border p-3">
-          <ul className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick actions">
-            {QUICK_ACTIONS.map((a) => (
-              <li key={a.label} className="shrink-0">
-                <button
-                  type="button"
-                  onClick={() => composer.prefill(a.text)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-agent/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  <a.icon className="size-3.5" aria-hidden />
-                  {a.label}
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className={cn('p-3 sm:p-4', !welcoming && 'border-t border-border')}>
           <form
-            className="flex items-end gap-2"
+            className="relative mx-auto w-full max-w-3xl"
             onSubmit={(e) => {
               e.preventDefault();
               submit(text);
             }}
             aria-label="Message your agent"
           >
-            <div className="relative min-w-0 flex-1">
+            <div className="relative min-w-0">
               <label htmlFor="agent-input" className="sr-only">
                 Message your agent
               </label>
@@ -385,12 +379,15 @@ export function AgentPanel({ user }: { user: UserView }) {
                 disabled={planning}
                 aria-describedby="agent-input-hint"
                 placeholder={planning ? 'Your agent is thinking…' : 'Ask your agent…'}
-                className="block max-h-[152px] min-h-11 w-full resize-none rounded-lg border border-input bg-surface-2 px-3.5 py-2.5 pr-14 text-sm leading-[22px] placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+                className={cn(
+                  'surface-highlight block max-h-[152px] w-full resize-none rounded-lg border border-input bg-surface-2 py-3.5 pr-16 pl-4.5 text-[15px] leading-[22px] transition-colors placeholder:text-subtle-foreground hover:border-white/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60',
+                  welcoming ? 'min-h-[104px]' : 'min-h-14',
+                )}
               />
               <span
                 id="agent-input-hint"
                 className={cn(
-                  'pointer-events-none absolute right-2.5 bottom-2 text-[10.5px] tabular-nums',
+                  'pointer-events-none absolute right-16 bottom-3 font-mono text-[10.5px] tabular-nums',
                   text.length > COMPOSER_MAX_CHARS - 50 ? 'text-caution' : 'text-subtle-foreground',
                 )}
               >
@@ -404,14 +401,33 @@ export function AgentPanel({ user }: { user: UserView }) {
             <Button
               type="submit"
               size="icon"
-              className="size-11 shrink-0"
+              className="absolute right-2.5 bottom-2.5 size-10 md:size-10"
               disabled={planning || text.trim().length === 0}
               aria-label="Send message"
             >
-              {planning ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
+              {planning ? <Loader2 className="animate-spin" /> : <ArrowUp />}
             </Button>
           </form>
+          <ul
+            className="mx-auto mt-2.5 flex max-w-3xl gap-1.5 overflow-x-auto pb-0.5"
+            aria-label="Quick actions"
+          >
+            {QUICK_ACTIONS.map((a) => (
+              <li key={a.label} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => composer.prefill(a.text)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <a.icon className="size-3.5" aria-hidden />
+                  {a.label}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
+
+        {welcoming && <Examples onPick={composer.prefill} />}
       </Panel>
     </ComposerContext.Provider>
   );
@@ -428,7 +444,7 @@ function FragmentWithSeparator({
     <>
       {day && (
         <li className="sticky top-0 z-[5] -my-1 flex justify-center" aria-hidden={false}>
-          <span className="rounded-full border border-border bg-card/95 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur">
+          <span className="micro-label rounded-full border border-border bg-card/95 px-2.5 py-0.5 text-muted-foreground backdrop-blur">
             {day}
           </span>
         </li>
@@ -438,42 +454,49 @@ function FragmentWithSeparator({
   );
 }
 
-function Welcome({ name, onPick }: { name: string | null; onPick: (t: string) => void }) {
+function Welcome({ name }: { name: string | null }) {
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-center py-6 text-center sm:py-10">
-      <span className="flex size-12 items-center justify-center rounded-2xl border border-agent/30 bg-agent/10 text-agent">
-        <Bot className="size-6" aria-hidden />
+    <div className="relative mx-auto flex max-w-xl flex-col items-center pt-4 pb-1 text-center sm:pt-6">
+      <Wordmark className="pointer-events-none absolute -top-14 left-1/2 hidden h-auto w-[620px] max-w-none -translate-x-1/2 text-foreground/[0.028] md:block" />
+      <span className="relative flex size-12 items-center justify-center rounded-full border border-agent/30 bg-agent/10 text-agent">
+        <Sparkles className="agent-breathe size-5" aria-hidden />
       </span>
-      <h3 className="mt-4 text-lg font-semibold tracking-tight">
+      <h3 className="text-h2 md:text-h1 relative mt-4 font-medium">
         Hi {name ?? 'there'} — I'm your agent.
       </h3>
-      <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+      <p className="relative mt-2 max-w-md text-sm text-muted-foreground">
         I think on 0G, build on Uniswap and check every trade before it runs. Small, safe actions I
         do alone; anything bigger waits for you.
       </p>
-      <ul
-        className="mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2"
-        aria-label="Example requests"
-      >
-        {EXAMPLES.map((e) => (
-          <li key={e.text}>
-            <button
-              type="button"
-              onClick={() => onPick(e.text)}
-              className="group flex h-full w-full items-start gap-3 rounded-lg border border-border bg-surface-2/60 p-3 text-left transition-colors hover:border-agent/40 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <e.icon className="mt-0.5 size-4 shrink-0 text-agent" aria-hidden />
-              <span className="min-w-0">
-                <span className="block text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                  {e.title}
-                </span>
-                <span className="mt-0.5 block text-sm font-medium">“{e.text}”</span>
-                <span className="mt-0.5 block text-xs text-subtle-foreground">{e.hint}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
+  );
+}
+
+function Examples({ onPick }: { onPick: (t: string) => void }) {
+  return (
+    <ul
+      className="mx-auto mt-1 grid w-full max-w-3xl grid-cols-1 gap-2.5 px-3 pb-4 sm:grid-cols-2 sm:px-4 lg:grid-cols-4"
+      aria-label="Example requests"
+    >
+      {EXAMPLES.map((e, i) => (
+        <li key={e.text}>
+          <button
+            type="button"
+            onClick={() => onPick(e.text)}
+            className="surface-highlight flex h-full w-full flex-col gap-2 rounded-md border border-border bg-card p-3.5 text-left transition-colors duration-150 hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <span className="flex items-center justify-between">
+              <CardIndex value={i + 1} />
+              <e.icon className="size-3.5 text-subtle-foreground" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="micro-label block text-muted-foreground">{e.title}</span>
+              <span className="mt-1 block text-sm font-medium">“{e.text}”</span>
+              <span className="mt-1 block text-xs text-subtle-foreground">{e.hint}</span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
