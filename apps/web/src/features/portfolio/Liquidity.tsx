@@ -1,6 +1,7 @@
 /** Portfolio "Liquidity" section (PHASE 07 §3): LP position cards with a range bar. */
 import type { LpPositionView } from '@warden/shared';
-import { Layers } from 'lucide-react';
+import { ChevronDown, Layers } from 'lucide-react';
+import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui-kit';
 import { requestPrefill } from '@/features/agent/prefill';
@@ -49,7 +50,9 @@ export function RangeBar({ p }: { p: LpPositionView }) {
   );
 }
 
-function PositionCard({ p }: { p: LpPositionView }) {
+function PositionCard({ p, startOpen }: { p: LpPositionView; startOpen: boolean }) {
+  const [open, setOpen] = useState(startOpen);
+  const bodyId = useId();
   const pair = `${p.token0.symbol}/${p.token1.symbol}`;
   const fees = [
     p.fees0 && Number(p.fees0) > 0 ? `${formatTokenAmount(p.fees0)} ${p.token0.symbol}` : null,
@@ -57,11 +60,18 @@ function PositionCard({ p }: { p: LpPositionView }) {
   ].filter(Boolean);
   const pnl = p.pnlUsd !== null ? Number(p.pnlUsd) : null;
   return (
-    <li className="rounded-lg border border-border bg-surface-2/40 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">{pair}</p>
-          <div className="mt-1 flex flex-wrap gap-1">
+    <li className="rounded-md border border-border bg-surface-2/40">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        aria-label={`${open ? 'Hide' : 'Show'} ${pair} position details`}
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-start justify-between gap-2 rounded-md p-3.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{pair}</span>
+          <span className="mt-1 flex flex-wrap gap-1">
             <Badge tone={p.inRange ? 'safe' : 'caution'}>
               {p.inRange ? 'In range' : 'Out of range'}
             </Badge>
@@ -71,46 +81,64 @@ function PositionCard({ p }: { p: LpPositionView }) {
                 {p.hook.band ? ` · ${BAND_META[p.hook.band].label}` : ''}
               </Badge>
             )}
+          </span>
+        </span>
+        <span className="flex items-start gap-2">
+          <span className="text-right">
+            <span className="block text-sm font-medium tabular-nums">
+              {p.valueUsd ? usd(p.valueUsd) : '—'}
+            </span>
+            {pnl !== null && (
+              <span
+                className={cn(
+                  'block text-[11px] tabular-nums',
+                  pnl >= 0 ? 'text-safe' : 'text-danger',
+                )}
+              >
+                {pnl >= 0 ? '+' : '−'}
+                {usd(String(Math.abs(pnl)))}
+              </span>
+            )}
+          </span>
+          <ChevronDown
+            className={cn(
+              'mt-0.5 size-4 shrink-0 text-subtle-foreground transition-transform duration-150',
+              !open && '-rotate-90',
+            )}
+            aria-hidden
+          />
+        </span>
+      </button>
+      {open && (
+        <div id={bodyId} className="px-3.5 pb-3.5">
+          <RangeBar p={p} />
+          <p className="mt-2 text-[11px] text-muted-foreground tabular-nums">
+            {formatTokenAmount(p.amount0)} {p.token0.symbol} + {formatTokenAmount(p.amount1)}{' '}
+            {p.token1.symbol}
+            {fees.length ? ` · fees ${fees.join(' + ')}` : ''}
+          </p>
+          <div className="mt-2.5 flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() =>
+                requestPrefill(`Rebalance my ${pair} position ${p.id} around the current price`)
+              }
+            >
+              Rebalance
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={() => requestPrefill(`Exit my ${pair} position ${p.id}`)}
+            >
+              Exit
+            </Button>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-semibold tabular-nums">{p.valueUsd ? usd(p.valueUsd) : '—'}</p>
-          {pnl !== null && (
-            <p className={cn('text-[11px] tabular-nums', pnl >= 0 ? 'text-safe' : 'text-danger')}>
-              {pnl >= 0 ? '+' : '−'}
-              {usd(String(Math.abs(pnl)))}
-            </p>
-          )}
-        </div>
-      </div>
-      <div className="mt-3">
-        <RangeBar p={p} />
-      </div>
-      <p className="mt-2 text-[11px] text-muted-foreground tabular-nums">
-        {formatTokenAmount(p.amount0)} {p.token0.symbol} + {formatTokenAmount(p.amount1)}{' '}
-        {p.token1.symbol}
-        {fees.length ? ` · fees ${fees.join(' + ')}` : ''}
-      </p>
-      <div className="mt-2.5 flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 flex-1 text-xs"
-          onClick={() =>
-            requestPrefill(`Rebalance my ${pair} position ${p.id} around the current price`)
-          }
-        >
-          Rebalance
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 flex-1 text-xs"
-          onClick={() => requestPrefill(`Exit my ${pair} position ${p.id}`)}
-        >
-          Exit
-        </Button>
-      </div>
+      )}
     </li>
   );
 }
@@ -120,7 +148,7 @@ export function LiquiditySection({ positions }: { positions: LpPositionView[] })
     return (
       <section
         aria-labelledby="lp-title"
-        className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/40 px-3.5 py-3"
+        className="flex items-center gap-3 rounded-md border border-border bg-surface-2/40 px-3.5 py-3"
       >
         <Layers className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -129,24 +157,20 @@ export function LiquiditySection({ positions }: { positions: LpPositionView[] })
           </h3>
           <p className="text-xs text-muted-foreground">No positions yet</p>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
-          onClick={() => requestPrefill('Put $10 into ETH/USDC')}
-        >
+        <Button size="sm" variant="ghost" onClick={() => requestPrefill('Put $10 into ETH/USDC')}>
           Add
         </Button>
       </section>
     );
   return (
     <section aria-labelledby="lp-title">
-      <h3 id="lp-title" className="mb-2 text-xs font-medium text-muted-foreground">
+      <h3 id="lp-title" className="micro-label mb-3 text-subtle-foreground">
         Liquidity · {positions.length} position{positions.length === 1 ? '' : 's'}
       </h3>
       <ul className="space-y-2">
         {positions.map((p) => (
-          <PositionCard key={p.id} p={p} />
+          // Short lists stay open; in a long one, only positions needing attention do.
+          <PositionCard key={p.id} p={p} startOpen={positions.length <= 3 || !p.inRange} />
         ))}
       </ul>
     </section>
