@@ -33,11 +33,11 @@ import { scoreTone, shortRoute, usd } from './card-utils';
 export type CardTone = 'agent' | 'caution' | 'danger' | 'safe' | 'neutral' | 'info';
 
 const TONE_BORDER: Record<CardTone, string> = {
-  agent: 'border-agent/30 bg-agent/[0.04]',
+  agent: 'border-agent/30 bg-agent/[0.06]',
   caution: 'border-warm/40 bg-warm/[0.05]',
   danger: 'border-danger/40 bg-danger/[0.045]',
   safe: 'border-safe/30 bg-safe/[0.035]',
-  neutral: 'border-border bg-background/40',
+  neutral: 'border-border bg-surface-2/60',
   info: 'border-border bg-surface-2/40',
 };
 const TONE_TEXT: Record<CardTone, string> = {
@@ -340,7 +340,7 @@ export function Reasons({
   return (
     <ul className="space-y-1.5">
       {reasons.map((r, i) => (
-        <li key={`${r.code}-${i}`} className="flex gap-2 text-[13px] leading-snug">
+        <li key={`${r.code}-${i}`} className="flex gap-2 text-sm leading-snug">
           <span
             className={cn(
               'mt-1.5 size-1.5 shrink-0 rounded-full',
@@ -353,7 +353,7 @@ export function Reasons({
             {r.value !== undefined && r.limit !== undefined && (
               <span
                 className={cn(
-                  'ml-1.5 inline-flex rounded px-1 text-[11px] font-semibold tabular-nums',
+                  'ml-1.5 inline-flex rounded px-1 text-xs font-semibold tabular-nums',
                   tone === 'danger' ? 'bg-danger/10 text-danger' : 'bg-caution/10 text-caution',
                 )}
               >

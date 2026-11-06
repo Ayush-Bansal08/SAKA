@@ -31,7 +31,7 @@ export function SuggestionCardView({ card }: { card: SuggestionCard }) {
         </>
       }
     >
-      <p className="text-[13px] leading-relaxed [overflow-wrap:anywhere]">{card.message}</p>
+      <p className="text-sm leading-relaxed [overflow-wrap:anywhere]">{card.message}</p>
       {card.amountUsd && (
         <p className="text-lg font-semibold tabular-nums">{usd(card.amountUsd)}</p>
       )}

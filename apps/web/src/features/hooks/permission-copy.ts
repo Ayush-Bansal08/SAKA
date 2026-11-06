@@ -103,3 +103,17 @@ export const pairLabel = (p: {
   token1Symbol: string | null;
 }) =>
   `${p.token0Symbol ?? `${p.token0.slice(0, 6)}…`}/${p.token1Symbol ?? `${p.token1.slice(0, 6)}…`}`;
+
+/** The explainer writes three labelled parts; the UI shows them as parts. Anything else stays whole. */
+export function splitExplanation(text: string): {
+  what: string;
+  why: string | null;
+  verdict: string | null;
+} {
+  const m =
+    /^What it does:\s*([\s\S]*?)\s*(?:Why it matters(?: to you)?:\s*([\s\S]*?)\s*)?(?:Our verdict:\s*([\s\S]*))?$/i.exec(
+      text.trim(),
+    );
+  if (!m) return { what: text, why: null, verdict: null };
+  return { what: m[1]!, why: m[2] ?? null, verdict: m[3]?.trim() ?? null };
+}

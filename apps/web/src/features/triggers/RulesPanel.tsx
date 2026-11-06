@@ -48,7 +48,7 @@ export function RuleRow({ t }: { t: TriggerView }) {
               </Badge>
             )}
           </div>
-          <p className="mt-1.5 text-[13px] leading-snug [overflow-wrap:anywhere]">{t.summary}</p>
+          <p className="mt-1.5 text-sm leading-snug [overflow-wrap:anywhere]">{t.summary}</p>
         </div>
         {t.status === 'ACTIVE' && (
           <Button
@@ -63,7 +63,7 @@ export function RuleRow({ t }: { t: TriggerView }) {
           </Button>
         )}
       </div>
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground tabular-nums">
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
         {t.targetPriceUsd && t.symbol && (
           <span className="inline-flex items-center gap-1">
             <Target className="size-3" aria-hidden /> {t.symbol}{' '}
@@ -81,7 +81,7 @@ export function RuleRow({ t }: { t: TriggerView }) {
       {t.lastResult && (
         <p
           className={cn(
-            'mt-1 text-[11px]',
+            'mt-1 text-xs',
             /^(Refused|Stopped|Could not)/.test(t.lastResult)
               ? 'text-danger'
               : 'text-subtle-foreground',
@@ -111,7 +111,7 @@ export function RulesPanel({
   return (
     <section
       aria-labelledby="rules-title"
-      className="surface-highlight rounded-lg border border-border bg-card"
+      className="glass rounded-lg border border-border"
     >
       <header className="flex min-h-14 items-center justify-between gap-2 px-5 py-2.5">
         <button
@@ -121,7 +121,7 @@ export function RulesPanel({
           className="flex min-w-0 items-center gap-2 rounded text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <ListTodo className="size-4 text-muted-foreground" aria-hidden />
-          <h3 id="rules-title" className="text-sm font-medium">
+          <h3 id="rules-title" className="text-[15px] font-semibold">
             Rules
           </h3>
           {active > 0 && <Badge tone="agent">{active} active</Badge>}

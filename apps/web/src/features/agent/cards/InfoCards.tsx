@@ -39,7 +39,7 @@ const BAND = {
 
 function MarketLabel({ source }: { source: InfoCard['marketDataSource'] }) {
   if (source !== 'reference') return null;
-  return <span className="text-[11px] text-subtle-foreground">Market data · Ethereum mainnet</span>;
+  return <span className="text-xs text-subtle-foreground">Market data · Ethereum mainnet</span>;
 }
 
 function TokenCheck({ d }: { d: Extract<InfoData, { kind: 'token_check' }> }) {
@@ -73,7 +73,7 @@ function TokenCheck({ d }: { d: Extract<InfoData, { kind: 'token_check' }> }) {
       <dl className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
         {facts.map(([k, val, ok]) => (
           <div key={k} className="rounded-md border border-border/70 bg-background/40 px-2.5 py-2">
-            <dt className="text-[11px] text-muted-foreground">{k}</dt>
+            <dt className="text-xs text-muted-foreground">{k}</dt>
             <dd
               className={cn(
                 'text-sm font-medium tabular-nums',
@@ -106,7 +106,7 @@ function PoolCompare({ d }: { d: Extract<InfoData, { kind: 'pool_compare' }> }) 
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[420px] text-left text-xs">
           <caption className="sr-only">Pools for {d.pair}, best first</caption>
-          <thead className="text-[11px] text-muted-foreground">
+          <thead className="text-xs text-muted-foreground">
             <tr>
               <th className="px-1 py-1 font-medium">#</th>
               <th className="px-1 py-1 font-medium">Fee</th>
@@ -203,7 +203,7 @@ function HookScore({ d }: { d: Extract<InfoData, { kind: 'hook_score' }> }) {
       </div>
       {d.permissions.length > 0 && (
         <div>
-          <p className="mb-1 text-[11px] text-muted-foreground">What it can do</p>
+          <p className="mb-1 text-xs text-muted-foreground">What it can do</p>
           <ul className="flex flex-wrap gap-1.5">
             {d.permissions.map((p) => (
               <li key={p.flag}>
@@ -359,7 +359,7 @@ export function InfoCardView({ card }: { card: InfoCard }) {
     const tone: CardTone = /fail|unavailable/i.test(card.title) ? 'danger' : 'neutral';
     return (
       <CardShell tone={tone} icon={<Info />} title={card.title} label={card.title}>
-        <p className="text-[13px] text-muted-foreground">{card.body}</p>
+        <p className="text-sm text-muted-foreground">{card.body}</p>
         {card.bullets && (
           <ul className="space-y-0.5 text-xs text-muted-foreground">
             {card.bullets.map((b) => (
@@ -390,7 +390,7 @@ export function InfoCardView({ card }: { card: InfoCard }) {
         card.marketDataSource === 'reference' ? <MarketLabel source="reference" /> : undefined
       }
     >
-      <p className="text-[13px] text-muted-foreground">{card.body}</p>
+      <p className="text-sm text-muted-foreground">{card.body}</p>
       {data.kind === 'trigger' && <TriggerRule d={data} />}
       {data.kind === 'token_check' && <TokenCheck d={data} />}
       {data.kind === 'pool_compare' && <PoolCompare d={data} />}

@@ -29,9 +29,9 @@ import {
 } from 'react';
 import type * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { AgentBadge, CardIndex, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
+import { AgentBadge, ErrorState, SkeletonRows } from '@/components/ui-kit';
 import { useTraceStream } from '@/features/trace/trace-context';
-import { Wordmark } from '@/layout/Logo';
+import { LogoMark } from '@/layout/Logo';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { dayLabel } from './cards/card-utils';
@@ -114,7 +114,7 @@ function Bubble({ item, preparing }: { item: FoldedMessage; preparing: boolean }
         {!mine && <PlanCards cards={item.cards} preparing={preparing} />}
         <p
           className={cn(
-            'mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[11px]',
+            'mt-1.5 flex flex-wrap items-center gap-2 text-xs',
             mine ? 'justify-end text-primary-foreground/70' : 'text-subtle-foreground',
           )}
         >
@@ -138,7 +138,16 @@ function useThinkingStep(traceId: string | null): string | null {
   }, [events, traceId]);
 }
 
-export function AgentPanel({ user, actions }: { user: UserView; actions?: React.ReactNode }) {
+export function AgentPanel({
+  user,
+  actions,
+  welcome,
+}: {
+  user: UserView;
+  actions?: React.ReactNode;
+  /** Shown under the prompt until the first message. */
+  welcome?: React.ReactNode;
+}) {
   const messagesQuery = useAgentMessages();
   const send = useSendAgentMessage();
   const [text, setText] = useState('');
@@ -270,101 +279,102 @@ export function AgentPanel({ user, actions }: { user: UserView; actions?: React.
 
   return (
     <ComposerContext.Provider value={composer}>
-      <Panel
-        id="agent"
-        title="Agent"
-        subtitle="Plans on 0G · builds on Uniswap · you stay in control"
-        icon={<Sparkles className={cn('text-agent', planning && 'agent-breathe')} />}
-        actions={
-          <>
+      <section id="agent" aria-label="Agent" className="relative flex h-full min-h-0 flex-col">
+        <header className="flex min-h-11 items-center justify-between gap-3 px-1 sm:px-2">
+          <p className="hidden truncate text-sm text-subtle-foreground md:block">
+            Plans on 0G · builds on Uniswap · you stay in control
+          </p>
+          <div className="ml-auto flex items-center gap-3">
             {actions}
-            <AgentBadge icon={<Sparkles aria-hidden />}>
+            <AgentBadge icon={<Sparkles aria-hidden />} className="px-2.5 py-1">
               {planning ? 'Thinking' : 'Ready'}
             </AgentBadge>
-          </>
-        }
-        className="h-full min-h-0"
-        bodyClassName={cn(
-          'relative flex min-h-0 flex-col overflow-y-auto p-0',
-          welcoming && 'justify-center',
-        )}
-      >
+          </div>
+        </header>
         <div
-          ref={scrollRef}
-          onScroll={onScroll}
           className={cn(
-            'min-h-0 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5',
-            welcoming ? 'flex-none' : 'flex-1',
+            'relative flex min-h-0 flex-1 flex-col overflow-y-auto',
+            welcoming && '[justify-content:safe_center]',
           )}
         >
-          {messagesQuery.isPending ? (
-            <SkeletonRows rows={4} label="Loading your conversation" />
-          ) : messagesQuery.isError && !messagesQuery.data ? (
-            <ErrorState
-              title="Couldn't load your conversation"
-              description={messagesQuery.error.message}
-              onRetry={() => void messagesQuery.refetch()}
-              retrying={messagesQuery.isFetching}
-            />
-          ) : visible.length === 0 && !optimistic ? (
-            <Welcome name={user.displayName} />
-          ) : (
-            <ol className="mx-auto flex w-full max-w-3xl flex-col gap-5" aria-label="Conversation">
-              {visible.map((item, idx) => {
-                const day = dayLabel(item.message.createdAt, now);
-                const sep = day !== lastDay;
-                lastDay = day;
-                return (
-                  <FragmentWithSeparator key={item.message.id} day={sep ? day : null}>
-                    <Bubble item={item} preparing={planning && idx === visible.length - 1} />
-                  </FragmentWithSeparator>
-                );
-              })}
-              {optimistic && (
-                <li className="flex justify-end">
-                  <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary/80 px-4 py-2.5 text-sm text-primary-foreground">
-                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                      {optimistic.text}
-                    </p>
-                    <p className="mt-1.5 text-right text-[11px] text-primary-foreground/70">
-                      Sending…
-                    </p>
-                  </div>
-                </li>
-              )}
-              {planning && (
-                <li className="flex items-center gap-2 pl-0 sm:pl-9" aria-live="polite">
-                  <Sparkles className="agent-breathe size-4 text-agent" aria-hidden />
-                  <span className="text-xs text-muted-foreground">
-                    Agent is thinking…
-                    {step && <span className="text-foreground/80"> · {step}</span>}
-                  </span>
-                </li>
-              )}
-            </ol>
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className={cn(
+              'min-h-0 overscroll-contain px-3 py-3 sm:px-5',
+              welcoming ? 'flex-none' : 'flex-1 overflow-y-auto',
+            )}
+          >
+            {messagesQuery.isPending ? (
+              <SkeletonRows rows={4} label="Loading your conversation" />
+            ) : messagesQuery.isError && !messagesQuery.data ? (
+              <ErrorState
+                title="Couldn't load your conversation"
+                description={messagesQuery.error.message}
+                onRetry={() => void messagesQuery.refetch()}
+                retrying={messagesQuery.isFetching}
+              />
+            ) : visible.length === 0 && !optimistic ? (
+              <Welcome name={user.displayName} />
+            ) : (
+              <ol
+                className="mx-auto flex w-full max-w-3xl flex-col gap-5"
+                aria-label="Conversation"
+              >
+                {visible.map((item, idx) => {
+                  const day = dayLabel(item.message.createdAt, now);
+                  const sep = day !== lastDay;
+                  lastDay = day;
+                  return (
+                    <FragmentWithSeparator key={item.message.id} day={sep ? day : null}>
+                      <Bubble item={item} preparing={planning && idx === visible.length - 1} />
+                    </FragmentWithSeparator>
+                  );
+                })}
+                {optimistic && (
+                  <li className="flex justify-end">
+                    <div className="max-w-[85%] rounded-xl rounded-br-sm bg-primary/80 px-4 py-2.5 text-sm text-primary-foreground">
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                        {optimistic.text}
+                      </p>
+                      <p className="mt-1.5 text-right text-xs text-primary-foreground/70">
+                        Sending…
+                      </p>
+                    </div>
+                  </li>
+                )}
+                {planning && (
+                  <li className="flex items-center gap-2 pl-0 sm:pl-9" aria-live="polite">
+                    <Sparkles className="agent-breathe size-4 text-agent" aria-hidden />
+                    <span className="text-xs text-muted-foreground">
+                      Agent is thinking…
+                      {step && <span className="text-foreground/80"> · {step}</span>}
+                    </span>
+                  </li>
+                )}
+              </ol>
+            )}
+          </div>
+
+          {unseen && (
+            <button
+              type="button"
+              onClick={() => scrollToEnd(true)}
+              className="absolute bottom-[132px] left-1/2 z-10 inline-flex min-h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-agent/40 bg-card px-3 py-1.5 text-xs font-medium text-agent hover:bg-surface-2"
+            >
+              <ArrowDown className="size-3.5" aria-hidden /> New messages
+            </button>
           )}
-        </div>
 
-        {unseen && (
-          <button
-            type="button"
-            onClick={() => scrollToEnd(true)}
-            className="absolute bottom-[132px] left-1/2 z-10 inline-flex min-h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-agent/40 bg-card px-3 py-1.5 text-xs font-medium text-agent hover:bg-surface-2"
-          >
-            <ArrowDown className="size-3.5" aria-hidden /> New messages
-          </button>
-        )}
-
-        <div className={cn('p-3 sm:p-4', !welcoming && 'border-t border-border')}>
-          <form
-            className="relative mx-auto w-full max-w-3xl"
-            onSubmit={(e) => {
-              e.preventDefault();
-              submit(text);
-            }}
-            aria-label="Message your agent"
-          >
-            <div className="relative min-w-0">
+          <div className="px-3 pt-2 pb-3 sm:px-5 sm:pb-4">
+            <form
+              className="glass relative mx-auto w-full max-w-3xl rounded-lg border border-border-strong transition-colors duration-150 focus-within:border-agent/70"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit(text);
+              }}
+              aria-label="Message your agent"
+            >
               <label htmlFor="agent-input" className="sr-only">
                 Message your agent
               </label>
@@ -378,57 +388,58 @@ export function AgentPanel({ user, actions }: { user: UserView; actions?: React.
                 maxLength={COMPOSER_MAX_CHARS}
                 disabled={planning}
                 aria-describedby="agent-input-hint"
-                placeholder={planning ? 'Your agent is thinking…' : 'Ask your agent…'}
+                placeholder={planning ? 'Your agent is thinking…' : 'Ask SAKA anything…'}
                 className={cn(
-                  'surface-highlight block max-h-[152px] w-full resize-none rounded-lg border border-input bg-surface-2 py-3.5 pr-16 pl-4.5 text-[15px] leading-[22px] transition-colors placeholder:text-subtle-foreground hover:border-white/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60',
-                  welcoming ? 'min-h-[104px]' : 'min-h-14',
+                  'block max-h-[152px] w-full resize-none bg-transparent px-5 pt-4 pb-1 text-base leading-[22px] placeholder:text-subtle-foreground focus-visible:outline-none disabled:opacity-60',
+                  welcoming ? 'min-h-[72px]' : 'min-h-11',
                 )}
               />
-              <span
-                id="agent-input-hint"
-                className={cn(
-                  'pointer-events-none absolute right-16 bottom-3 font-mono text-[10.5px] tabular-nums',
-                  text.length > COMPOSER_MAX_CHARS - 50 ? 'text-caution' : 'text-subtle-foreground',
-                )}
-              >
-                {text.length > 0 ? (
-                  `${text.length}/${COMPOSER_MAX_CHARS}`
-                ) : (
-                  <span className="hidden sm:inline">⏎ send · ⇧⏎ line</span>
-                )}
-              </span>
-            </div>
-            <Button
-              type="submit"
-              size="icon"
-              className="absolute right-2.5 bottom-2.5 size-10 md:size-10"
-              disabled={planning || text.trim().length === 0}
-              aria-label="Send message"
-            >
-              {planning ? <Loader2 className="animate-spin" /> : <ArrowUp />}
-            </Button>
-          </form>
-          <ul
-            className="mx-auto mt-2.5 flex max-w-3xl gap-1.5 overflow-x-auto pb-0.5"
-            aria-label="Quick actions"
-          >
-            {QUICK_ACTIONS.map((a) => (
-              <li key={a.label} className="shrink-0">
-                <button
-                  type="button"
-                  onClick={() => composer.prefill(a.text)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              <div className="flex items-center gap-2 px-3 pt-1 pb-3">
+                <ul
+                  className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5"
+                  aria-label="Quick actions"
                 >
-                  <a.icon className="size-3.5" aria-hidden />
-                  {a.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+                  {QUICK_ACTIONS.map((a) => (
+                    <li key={a.label} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => composer.prefill(a.text)}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface-2 px-3 text-sm text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        <a.icon className="size-4" aria-hidden />
+                        {a.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <span
+                  id="agent-input-hint"
+                  className={cn(
+                    'shrink-0 text-xs tabular-nums',
+                    text.length > COMPOSER_MAX_CHARS - 50
+                      ? 'text-caution'
+                      : 'text-subtle-foreground',
+                  )}
+                >
+                  {text.length > 0 ? `${text.length}/${COMPOSER_MAX_CHARS}` : ''}
+                </span>
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="size-10 shrink-0 md:size-10"
+                  disabled={planning || text.trim().length === 0}
+                  aria-label="Send message"
+                >
+                  {planning ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+                </Button>
+              </div>
+            </form>
+          </div>
 
-        {welcoming && <Examples onPick={composer.prefill} />}
-      </Panel>
+          {welcoming && <Examples onPick={composer.prefill} />}
+          {welcoming && welcome}
+        </div>
+      </section>
     </ComposerContext.Provider>
   );
 }
@@ -444,7 +455,7 @@ function FragmentWithSeparator({
     <>
       {day && (
         <li className="sticky top-0 z-[5] -my-1 flex justify-center" aria-hidden={false}>
-          <span className="micro-label rounded-full border border-border bg-card/95 px-2.5 py-0.5 text-muted-foreground backdrop-blur">
+          <span className="rounded-full border border-border bg-popover px-3 py-0.5 text-xs font-medium text-muted-foreground">
             {day}
           </span>
         </li>
@@ -456,17 +467,20 @@ function FragmentWithSeparator({
 
 function Welcome({ name }: { name: string | null }) {
   return (
-    <div className="relative mx-auto flex max-w-xl flex-col items-center pt-4 pb-1 text-center sm:pt-6">
-      <Wordmark className="pointer-events-none absolute -top-14 left-1/2 hidden h-auto w-[620px] max-w-none -translate-x-1/2 text-foreground/[0.028] md:block" />
-      <span className="relative flex size-12 items-center justify-center rounded-full border border-agent/30 bg-agent/10 text-agent">
-        <Sparkles className="agent-breathe size-5" aria-hidden />
+    <div className="mx-auto flex max-w-xl flex-col items-center pt-2 pb-2 text-center">
+      <span className="relative flex size-16 items-center justify-center text-agent">
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-full bg-[radial-gradient(closest-side,var(--brand),transparent)] opacity-50 blur-md"
+        />
+        <LogoMark className="relative size-12" />
       </span>
-      <h3 className="text-h2 md:text-h1 relative mt-4 font-medium">
-        Hi {name ?? 'there'} — I'm your agent.
-      </h3>
-      <p className="relative mt-2 max-w-md text-sm text-muted-foreground">
-        I think on 0G, build on Uniswap and check every trade before it runs. Small, safe actions I
-        do alone; anything bigger waits for you.
+      <p className="mt-3 text-sm font-medium tracking-[0.18em] text-muted-foreground uppercase">
+        Welcome back{name ? `, ${name}` : ''}
+      </p>
+      <h1 className="text-h1 mt-2 font-semibold">What should SAKA do next?</h1>
+      <p className="mt-2 max-w-md text-[15px] text-muted-foreground">
+        Small, safe actions I do alone. Anything bigger waits for you.
       </p>
     </div>
   );
@@ -475,25 +489,18 @@ function Welcome({ name }: { name: string | null }) {
 function Examples({ onPick }: { onPick: (t: string) => void }) {
   return (
     <ul
-      className="mx-auto mt-1 grid w-full max-w-3xl grid-cols-1 gap-2.5 px-3 pb-4 sm:grid-cols-2 sm:px-4 lg:grid-cols-4"
+      className="mx-auto flex w-full max-w-3xl flex-wrap justify-center gap-2 px-3 pb-4 sm:px-5"
       aria-label="Example requests"
     >
-      {EXAMPLES.map((e, i) => (
+      {EXAMPLES.map((e) => (
         <li key={e.text}>
           <button
             type="button"
+            title={e.hint}
             onClick={() => onPick(e.text)}
-            className="surface-highlight flex h-full w-full flex-col gap-2 rounded-md border border-border bg-card p-3.5 text-left transition-colors duration-150 hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="min-h-9 rounded-full px-3 text-sm text-subtle-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
-            <span className="flex items-center justify-between">
-              <CardIndex value={i + 1} />
-              <e.icon className="size-3.5 text-subtle-foreground" aria-hidden />
-            </span>
-            <span className="min-w-0">
-              <span className="micro-label block text-muted-foreground">{e.title}</span>
-              <span className="mt-1 block text-sm font-medium">“{e.text}”</span>
-              <span className="mt-1 block text-xs text-subtle-foreground">{e.hint}</span>
-            </span>
+            “{e.text}”
           </button>
         </li>
       ))}

@@ -36,7 +36,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'surface-highlight relative rounded-lg border border-border bg-card transition-colors duration-150',
+        'glass relative rounded-lg border border-border transition-colors duration-150',
         selected && 'border-border-strong',
         className,
       )}
@@ -71,7 +71,7 @@ export function CardIndex({ value }: { value: number }) {
 /** Small tag chip for the row under a card title. */
 export function TagChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-sm border border-border px-2 py-0.5 text-[11px] leading-4 text-muted-foreground">
+    <span className="inline-flex items-center rounded-sm border border-border px-2 py-0.5 text-xs leading-4 text-muted-foreground">
       {children}
     </span>
   );

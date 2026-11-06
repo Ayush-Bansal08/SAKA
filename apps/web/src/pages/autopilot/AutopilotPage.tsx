@@ -64,7 +64,7 @@ export function AutopilotPage() {
       ...(pending > 0
         ? {
             badge: (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-warm px-1.5 text-[10.5px] leading-5 font-semibold text-background tabular-nums">
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-warm px-1.5 text-xs leading-5 font-semibold text-background tabular-nums">
                 {pending > 9 ? '9+' : pending}
               </span>
             ),
@@ -75,23 +75,17 @@ export function AutopilotPage() {
     ...(providers.data?.demoSimulator ? [{ to: '/autopilot/simulator', label: 'Simulator' }] : []),
   ];
   return (
-    <div className="relative min-h-full">
-      <div aria-hidden className="beam" />
-      <div className="relative">
-        <PageContainer>
-          <PageHeader
-            eyebrow="Autopilot"
-            title="What SAKA does"
-            accent="on its own"
-            actions={<InternalsToggle />}
-          />
-          <MandateChips />
-          <TabNav label="Autopilot" items={tabs} />
-          <div className="mt-6">
-            <Outlet context={{ user }} />
-          </div>
-        </PageContainer>
+    <PageContainer>
+      <PageHeader
+        title="Autopilot"
+        description="What SAKA does on its own, and what it needs from you."
+        actions={<InternalsToggle />}
+      />
+      <MandateChips />
+      <TabNav label="Autopilot" items={tabs} />
+      <div className="mt-6">
+        <Outlet context={{ user }} />
       </div>
-    </div>
+    </PageContainer>
   );
 }

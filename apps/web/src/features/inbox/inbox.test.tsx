@@ -171,7 +171,7 @@ describe('SuggestionRow', () => {
       },
     });
     await userEvent.click(screen.getByRole('button', { name: 'Change' }));
-    await waitFor(() => expect(ui.location()).toBe('/ask'));
+    await waitFor(() => expect(ui.location()).toBe('/app'));
     const sub = subscribePrefill(() => undefined);
     expect(sub.initial).toBe('Swap $20 USDC to ETH');
     sub.unsubscribe();

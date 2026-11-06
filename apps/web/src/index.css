@@ -1,20 +1,17 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import '@fontsource-variable/geist';
-@import '@fontsource-variable/geist-mono';
-@import '@fontsource/instrument-serif/400-italic.css';
+@import '@fontsource-variable/manrope';
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
 /*
- * SAKA design system: dark-first, calm, depth from light rather than shadow.
+ * SAKA design system: purple-black glass, one typeface, generous type.
  *
- * Color roles are fixed. Blue (--ai) means the agent. Orange (--warm) means simulated or
- * needs attention. Green and red are real outcomes only. Neutrals carry everything else,
- * including the human's own actions (the light pill).
+ * Color roles are fixed. Violet is the agent and the brand. Warm orange means simulated or needs
+ * attention. Green and red are real outcomes only. Neutrals carry everything else.
  *
- * The first block holds the design tokens. The second maps the semantic names the components
- * use onto them, and @theme exposes those to Tailwind.
+ * The first block holds the design tokens. The second maps the semantic names the components use
+ * onto them, and @theme exposes those to Tailwind.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -22,31 +19,30 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces */
-  --bg-0: #07080c;
-  --bg-1: #0d0f15;
-  --bg-2: #141722;
-  --bg-3: #1c2030;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
+  /* Surfaces: translucent, so the ambient light behind them shows through as glass. */
+  --bg-0: #0a0712;
+  --bg-1: rgba(255, 255, 255, 0.045);
+  --bg-2: rgba(255, 255, 255, 0.06);
+  --bg-3: rgba(255, 255, 255, 0.1);
+  --bg-solid: #171122;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.18);
 
-  /* Text. --text-3 is lighter than the spec value so muted labels pass WCAG AA on every surface. */
-  --text-1: #f4f5f8;
-  --text-2: #a3a8b8;
-  --text-3: #858b9f;
+  /* Text: every value passes WCAG AA on every surface, including over the brightest glow. */
+  --text-1: #f5f3fa;
+  --text-2: #bdb7cc;
+  --text-3: #a49eb8;
 
   /* Roles */
-  --ai: #7b93ff;
-  --ai-soft: rgba(123, 147, 255, 0.14);
-  --ai-deep: #3b4fd8;
-  --warm: #f08a4b;
-  --warm-soft: rgba(240, 138, 75, 0.14);
-  --success: #3dd68c;
-  --danger: #ff5c6c;
-  --warning: #f2b84b;
-
-  /* Depth */
-  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --ai: #b794ff;
+  --ai-soft: rgba(167, 139, 250, 0.16);
+  --ai-deep: #6d28d9;
+  --brand: #7c3aed;
+  --warm: #f5a35c;
+  --warm-soft: rgba(245, 163, 92, 0.14);
+  --success: #4ade9a;
+  --danger: #ff7a8a;
+  --warning: #f5c463;
 
   /* Semantic names used by the components */
   --background: var(--bg-0);
@@ -55,7 +51,7 @@
   --card-foreground: var(--text-1);
   --surface-2: var(--bg-2);
   --surface-3: var(--bg-3);
-  --popover: var(--bg-2);
+  --popover: var(--bg-solid);
   --popover-foreground: var(--text-1);
   --border: var(--line);
   --border-strong: var(--line-strong);
@@ -65,8 +61,8 @@
   --muted-foreground: var(--text-2);
   --subtle-foreground: var(--text-3);
 
-  --primary: var(--text-1);
-  --primary-foreground: var(--bg-0);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
   --secondary: var(--bg-2);
   --secondary-foreground: var(--text-1);
   --accent: var(--bg-3);
@@ -84,12 +80,9 @@
 
 @theme inline {
   --font-sans:
-    'Geist Variable', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    'Manrope Variable', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
     sans-serif;
-  --font-mono:
-    'Geist Mono Variable', 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
-    monospace;
-  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -126,8 +119,8 @@
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 }
 
 @layer base {
@@ -148,15 +141,17 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Film grain: one fixed layer for the whole app. */
-  body::after {
+  /* Ambient light: one fixed layer the glass surfaces sit on. */
+  body::before {
     content: '';
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: -1;
     pointer-events: none;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background:
+      radial-gradient(60% 50% at 62% -8%, rgba(124, 58, 237, 0.3), transparent 70%),
+      radial-gradient(40% 44% at 0% 100%, rgba(109, 40, 217, 0.18), transparent 70%),
+      radial-gradient(36% 40% at 100% 88%, rgba(192, 132, 252, 0.1), transparent 70%);
   }
 
   ::selection {
@@ -168,6 +163,10 @@
     outline-offset: 2px;
   }
 
+  select option {
+    background: var(--bg-solid);
+  }
+
   /* Quiet, thin scrollbars that match the surfaces */
   * {
     scrollbar-width: thin;
@@ -177,64 +176,73 @@
 
 /* Type scale: desktop → mobile. */
 @utility text-display {
-  font-size: 36px;
-  line-height: 40px;
-  letter-spacing: -0.02em;
+  font-size: 40px;
+  line-height: 46px;
+  letter-spacing: -0.03em;
   @variant md {
-    font-size: 56px;
-    line-height: 60px;
+    font-size: 68px;
+    line-height: 74px;
   }
 }
 
 @utility text-h1 {
-  font-size: 28px;
-  line-height: 34px;
+  font-size: 26px;
+  line-height: 32px;
   letter-spacing: -0.02em;
   @variant md {
-    font-size: 36px;
-    line-height: 42px;
+    font-size: 30px;
+    line-height: 38px;
   }
 }
 
 @utility text-h2 {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 30px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 @utility text-h3 {
-  font-size: 18px;
-  line-height: 26px;
+  font-size: 17px;
+  line-height: 24px;
   letter-spacing: -0.01em;
 }
 
-/* Mono uppercase label: nav, eyebrows, metadata. */
+/* Small label for stats and table heads: readable first, decorative never. */
 @utility micro-label {
-  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+/* The one uppercase style: sidebar group headings. */
+@utility nav-heading {
   font-size: 11px;
   line-height: 16px;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-/* The serif accent: one phrase per view header at most, never numbers or UI. */
-@utility serif-accent {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-
-/* White fading into soft blue, for the key words of a hero headline. */
+/* White fading into violet, for the key words of the landing headline. */
 @utility text-gradient-ai {
-  background-image: linear-gradient(100deg, var(--text-1) 20%, var(--ai) 110%);
+  background-image: linear-gradient(100deg, var(--text-1) 10%, var(--ai) 75%, #e9a8ff 120%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
+/* Frosted surface: every card, panel and drawer. */
+@utility glass {
+  background-color: var(--card);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
 @utility surface-highlight {
-  box-shadow: var(--inner-highlight);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 @layer utilities {
@@ -274,109 +282,6 @@
     opacity: 0;
     transform: translateY(8px);
   }
-}
-
-@keyframes shimmer-sweep {
-  from {
-    background-position: 140% 0;
-  }
-  to {
-    background-position: -40% 0;
-  }
-}
-
-/*
- * Brand backdrops.
- * .dot-matrix: an LED field lit by soft diagonal streaks, for splash, connect and share images.
- * .horizon: the glowing arc. Home only, because it is the signature moment.
- */
-.dot-matrix {
-  position: relative;
-  isolation: isolate;
-  background: var(--bg-0);
-}
-
-.dot-matrix::before,
-.dot-matrix::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.dot-matrix::before {
-  background:
-    radial-gradient(60% 34% at 82% 16%, rgba(214, 222, 255, 0.5), transparent 70%),
-    radial-gradient(52% 30% at 8% 80%, rgba(240, 225, 205, 0.42), transparent 70%),
-    radial-gradient(40% 40% at 94% 62%, rgba(59, 79, 216, 0.34), transparent 70%);
-  filter: blur(26px);
-}
-
-/* A solid sheet with round holes: the light behind shows through as LED dots. */
-.dot-matrix::after {
-  background: var(--bg-0);
-  mask-image: radial-gradient(circle, transparent 1.35px, #000 1.85px);
-  mask-size: 6px 6px;
-}
-
-.horizon {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 460px;
-  overflow: hidden;
-  pointer-events: none;
-  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
-}
-
-.horizon::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 34px;
-  width: max(1500px, 130%);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  background: radial-gradient(closest-side, var(--bg-0) 96%, rgba(59, 79, 216, 0.26) 100%);
-  box-shadow:
-    0 -1px 2px rgba(226, 232, 255, 0.9),
-    0 -3px 30px rgba(123, 147, 255, 0.85),
-    0 -18px 90px rgba(59, 79, 216, 0.75),
-    0 -50px 200px rgba(59, 79, 216, 0.4);
-}
-
-.horizon::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to right,
-    var(--bg-0) 4%,
-    transparent 34%,
-    transparent 66%,
-    var(--bg-0) 96%
-  );
-}
-
-/* A faint LED layer behind the Home hero. */
-.dot-field {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 420px;
-  pointer-events: none;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.4px);
-  background-size: 6px 6px;
-  mask-image: radial-gradient(60% 80% at 50% 0%, #000, transparent 75%);
-}
-
-/* A directional beam: the Autopilot header's one accent. */
-.beam {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 300px;
-  pointer-events: none;
-  background: radial-gradient(70% 90% at 100% 0%, var(--ai-soft), transparent 70%);
 }
 
 /* Everything beyond a simple opacity change stops. */

@@ -52,7 +52,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <h3 className="micro-label text-subtle-foreground">{title}</h3>
-      <div className="mt-1.5 text-[13px] [overflow-wrap:anywhere]">{children}</div>
+      <div className="mt-1.5 text-sm [overflow-wrap:anywhere]">{children}</div>
     </section>
   );
 }
@@ -215,7 +215,7 @@ export function DecisionCard({
           {digest?.alternativesConsidered && digest.alternativesConsidered.length > 0 && (
             <section className="border-t border-border pt-3">
               <Disclosure title="Alternatives considered" technical>
-                <ul className="space-y-1 text-[13px]">
+                <ul className="space-y-1 text-sm">
                   {digest.alternativesConsidered.map((a, i) => (
                     <li key={i}>
                       {a.option}

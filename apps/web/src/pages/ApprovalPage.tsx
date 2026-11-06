@@ -19,7 +19,6 @@ export function ApprovalPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Approval"
         title="This needs you"
         description="Your agent wants to do something that needs you."
       />
@@ -40,7 +39,7 @@ export function ApprovalPage() {
         ) : a ? (
           <div className="space-y-4 text-sm">
             <p>{a.reason}</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
               <dt className="text-muted-foreground">Value</dt>
               <dd className="tabular-nums">${a.amountUsd}</dd>
               <dt className="text-muted-foreground">Status</dt>
@@ -96,7 +95,7 @@ export function ApprovalPage() {
                 left === 0
                   ? 'Nothing was traded. '
                   : 'This approval is closed. '}
-                <Link to="/ask" className="text-primary underline underline-offset-4">
+                <Link to="/app" className="text-primary underline underline-offset-4">
                   Back to your agent
                 </Link>
               </p>

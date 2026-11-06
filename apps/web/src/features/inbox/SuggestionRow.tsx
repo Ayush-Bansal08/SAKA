@@ -68,11 +68,11 @@ export function SuggestionRow({ s }: { s: SuggestionView }) {
           {s.severity === 'RED' && <Badge tone="danger">Red alert</Badge>}
           {s.simulated && <Badge tone="warm">Simulated (demo)</Badge>}
         </div>
-        <p className="mt-0.5 text-[13px] text-muted-foreground [overflow-wrap:anywhere]">
+        <p className="mt-0.5 text-sm text-muted-foreground [overflow-wrap:anywhere]">
           {s.message}
         </p>
         {s.note && (
-          <p className="mt-1 text-[13px] text-foreground/85 [overflow-wrap:anywhere]">{s.note}</p>
+          <p className="mt-1 text-sm text-foreground/85 [overflow-wrap:anywhere]">{s.note}</p>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           {plan && (

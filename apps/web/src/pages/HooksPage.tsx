@@ -40,9 +40,9 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'min-h-9 rounded-full border px-3.5 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'min-h-9 rounded-full border px-4 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         active
-          ? 'border-border-strong bg-surface-3 text-foreground'
+          ? 'border-agent/60 bg-agent/15 text-foreground'
           : 'border-border text-muted-foreground hover:text-foreground',
       )}
     >
@@ -53,7 +53,7 @@ function Chip({
 
 function CardSkeleton() {
   return (
-    <div className="rounded-lg border border-border bg-card p-4" aria-hidden>
+    <div className="glass rounded-lg border border-border p-5" aria-hidden>
       <div className="flex gap-3">
         <Skeleton className="size-14 rounded-full" />
         <div className="flex-1 space-y-2">
@@ -91,39 +91,67 @@ export function HooksPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Hooks"
-        title="Uniswap v4 hooks,"
-        accent="explained"
+        title="Uniswap v4 hooks, explained"
         description="Every hook gets a 0–100 safety score from the Uniswap v4 Security Framework (deterministic) and a plain-English explanation written on 0G."
       />
-      <div
-        role="tablist"
-        aria-label="Hook source"
-        className="mb-4 inline-flex max-w-full flex-wrap rounded-lg border border-border bg-card p-1"
-      >
-        {(
-          [
-            ['market', 'Market', 'Ethereum mainnet · read-only'],
-            ['execution', 'Tradeable', execName],
-          ] as const
-        ).map(([id, label, sub]) => (
-          <button
-            key={id}
-            role="tab"
-            type="button"
-            aria-selected={scope === id}
-            onClick={() => setScope(id)}
-            className={cn(
-              'min-h-9 rounded-md px-3.5 py-1.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-              scope === id
-                ? 'bg-surface-3 text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {label}
-            <span className="ml-1.5 text-[11px] font-normal text-subtle-foreground">{sub}</span>
-          </button>
-        ))}
+
+      <div className="glass mb-4 flex flex-wrap items-center gap-2.5 rounded-lg border border-border p-2.5">
+        <div role="tablist" aria-label="Hook source" className="flex flex-wrap gap-1">
+          {(
+            [
+              ['market', 'Market', 'Ethereum mainnet · read-only'],
+              ['execution', 'Tradeable', execName],
+            ] as const
+          ).map(([id, label, sub]) => (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              aria-selected={scope === id}
+              onClick={() => setScope(id)}
+              className={cn(
+                'min-h-10 rounded-md px-3.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                scope === id
+                  ? 'bg-surface-3 text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+              <span className="ml-1.5 hidden text-xs font-normal text-subtle-foreground md:inline">
+                {sub}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="relative min-w-[200px] flex-1">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle-foreground"
+            aria-hidden
+          />
+          <label htmlFor="hook-search" className="sr-only">
+            Search hooks by address or token
+          </label>
+          <input
+            id="hook-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by token or 0x address"
+            className="h-11 w-full rounded-md border border-border bg-surface-2 pr-3 pl-9 text-sm placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-10"
+          />
+        </div>
+        <label htmlFor="hook-sort" className="sr-only">
+          Sort
+        </label>
+        <select
+          id="hook-sort"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as HookFilters['sort'])}
+          className="h-11 rounded-md border border-border bg-surface-2 px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-10"
+        >
+          <option value="new">Newest</option>
+          <option value="tvl">Highest TVL</option>
+          <option value="score">Safest</option>
+        </select>
       </div>
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -135,53 +163,19 @@ export function HooksPage() {
         <Chip active={fresh} onClick={() => setFresh((v) => !v)}>
           New this week
         </Chip>
-        <div className="relative ml-auto w-full sm:w-64">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-subtle-foreground"
-            aria-hidden
-          />
-          <label htmlFor="hook-search" className="sr-only">
-            Search hooks by address or token
-          </label>
-          <input
-            id="hook-search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="0x… or USDC"
-            className="h-11 w-full rounded-md border border-input bg-surface-2 pr-3 pl-8 text-sm md:h-10 placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          />
-        </div>
-        <label htmlFor="hook-sort" className="sr-only">
-          Sort
-        </label>
-        <select
-          id="hook-sort"
-          value={sort}
-          onChange={(e) => setSort(e.target.value as HookFilters['sort'])}
-          className="h-11 rounded-md border border-input bg-surface-2 px-3 text-sm md:h-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          <option value="new">Newest</option>
-          <option value="tvl">Highest TVL</option>
-          <option value="score">Safest</option>
-        </select>
+        {first && (
+          <p className="ml-auto text-sm text-subtle-foreground">
+            {first.total} hook{first.total === 1 ? '' : 's'}
+            {first.indexedAt
+              ? ` · indexed ${formatRelative(first.indexedAt)}`
+              : ' · first scan in progress'}
+            {scope === 'market' ? ' · Market data · Ethereum mainnet' : ''}
+          </p>
+        )}
       </div>
 
-      {first && (
-        <p className="mb-3 text-xs text-subtle-foreground">
-          {first.total} hook{first.total === 1 ? '' : 's'}
-          {first.indexedAt
-            ? ` · indexed ${formatRelative(first.indexedAt)}`
-            : ' · first scan in progress'}
-          {scope === 'market' ? ' · Market data · Ethereum mainnet' : ''}
-        </p>
-      )}
-
       {hooks.isPending ? (
-        <div
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          aria-busy="true"
-          aria-label="Loading hooks"
-        >
+        <div className="grid gap-4 lg:grid-cols-2" aria-busy="true" aria-label="Loading hooks">
           {Array.from({ length: 6 }, (_, i) => (
             <CardSkeleton key={i} />
           ))}
@@ -194,7 +188,7 @@ export function HooksPage() {
           retrying={hooks.isFetching}
         />
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card">
+        <div className="glass rounded-lg border border-border">
           <EmptyState
             icon={<Blocks />}
             title={
@@ -217,7 +211,7 @@ export function HooksPage() {
         </div>
       ) : (
         <>
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-4 lg:grid-cols-2">
             {items.map((h) => (
               <li key={`${h.chainId}-${h.address}`}>
                 <HookCard hook={h} />

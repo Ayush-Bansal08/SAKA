@@ -57,7 +57,7 @@ export function StreamStatusPill({
       aria-live="polite"
       aria-label={`Activity stream ${meta.label.toLowerCase()}`}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium',
+        'inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium',
         meta.text,
       )}
     >
@@ -248,7 +248,7 @@ const RunItem = memo(function RunItem({
             <span className="block truncate text-sm font-medium">
               {requestText ? `“${requestText}”` : run.title}
             </span>
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-subtle-foreground">
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle-foreground">
               <Badge tone={meta.tone}>{meta.label}</Badge>
               <span className="tabular-nums">
                 {events.length} step{events.length === 1 ? '' : 's'}
@@ -318,13 +318,13 @@ export const EventRow = memo(function EventRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="min-w-0 text-[13px] leading-5 font-medium [overflow-wrap:anywhere]">
+          <p className="min-w-0 text-sm leading-5 font-medium [overflow-wrap:anywhere]">
             {title}
           </p>
           <time
             dateTime={event.ts}
             title={formatFullTime(event.ts)}
-            className="shrink-0 font-mono text-[10.5px] text-subtle-foreground tabular-nums"
+            className="shrink-0 text-xs text-subtle-foreground tabular-nums tabular-nums"
           >
             {formatRelative(event.ts, now)}
           </time>
@@ -377,7 +377,7 @@ export const EventRow = memo(function EventRow({
             {open && (
               <pre
                 id={detailsId}
-                className="mt-1.5 max-h-56 overflow-auto rounded-md border border-border bg-background/60 p-2 font-mono text-[10.5px] leading-relaxed text-foreground/80"
+                className="mt-1.5 max-h-56 overflow-auto rounded-md border border-border bg-background/60 p-2 font-mono text-xs leading-relaxed text-foreground/80"
               >
                 {JSON.stringify(
                   { ...(event.zg ? { zg: event.zg } : {}), data: event.data },

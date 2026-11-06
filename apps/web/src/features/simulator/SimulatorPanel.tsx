@@ -112,7 +112,7 @@ export function SimulatorPanel() {
                   />
                 ))}
               </ul>
-              <p className="mt-4 text-[13px] font-medium">{MODE_HELP[mode]}</p>
+              <p className="mt-4 text-sm font-medium">{MODE_HELP[mode]}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 The first two are both ETH drops. The trigger is alike; the evidence around it is
                 not. Market data in these runs is simulated, and real transactions always use the
@@ -157,7 +157,7 @@ export function SimulatorPanel() {
                   {r.rejected && <Badge tone="caution">Rejected</Badge>}
                   {r.status === 'FAILED' && <Badge tone="danger">Failed</Badge>}
                   {r.status === 'RUNNING' && <Badge tone="agent">Running</Badge>}
-                  <span className="font-mono text-[11px] text-subtle-foreground">
+                  <span className="text-xs text-subtle-foreground tabular-nums">
                     {formatRelative(r.createdAt, now)}
                   </span>
                 </button>

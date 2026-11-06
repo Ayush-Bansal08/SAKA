@@ -1,5 +1,5 @@
 import { usd, type UserView } from '@warden/shared';
-import { Blocks, ChevronDown, LogOut, Settings } from 'lucide-react';
+import { ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import {
@@ -27,7 +27,7 @@ export function UserMenu({ user }: { user: UserView }) {
         aria-label={`Account menu for ${name}`}
         className="flex items-center gap-2 rounded-full border border-border bg-surface-2 py-0.5 pr-2 pl-0.5 text-sm transition-colors outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <span className="flex size-8 items-center justify-center rounded-full bg-surface-3 text-xs font-semibold text-foreground">
+        <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
           {initials(user.displayName)}
         </span>
         <span className="hidden max-w-[8rem] truncate font-medium lg:inline">{name}</span>
@@ -56,9 +56,6 @@ export function UserMenu({ user }: { user: UserView }) {
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="sm:hidden" onSelect={() => navigate('/hooks')}>
-          <Blocks aria-hidden /> Hooks
-        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => navigate('/settings')}>
           <Settings aria-hidden /> Settings
         </DropdownMenuItem>

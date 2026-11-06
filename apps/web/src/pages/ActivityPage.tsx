@@ -106,7 +106,7 @@ function ActivityRow({
           !open && 'border-b last:border-b-0',
         )}
       >
-        <td className="px-5 py-2.5 font-mono text-[11px] whitespace-nowrap text-subtle-foreground">
+        <td className="px-5 py-2.5 text-xs whitespace-nowrap text-subtle-foreground tabular-nums">
           <time dateTime={r.createdAt} title={formatFullTime(r.createdAt)}>
             {formatRelative(r.createdAt)}
           </time>
@@ -239,10 +239,8 @@ export function ActivityPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Activity"
-        title="Everything it did,"
-        accent="and refused to do"
-        description="With on-chain and 0G proofs for every action."
+        title="Activity"
+        description="Everything your agent did, and everything it refused to do, with proofs."
       />
       <Panel
         title="All actions"

@@ -110,7 +110,7 @@ export function PreviewCardView({ card }: { card: PreviewCard }) {
       {queued && (
         <div className="overflow-hidden rounded-md border border-agent/30 bg-agent/[0.08]">
           <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-            <p className="flex items-center gap-2 text-[13px]" aria-live="polite">
+            <p className="flex items-center gap-2 text-sm" aria-live="polite">
               {secondsLeft > 0 ? (
                 <>
                   <Clock className="size-3.5 text-agent" aria-hidden />
@@ -145,13 +145,13 @@ export function PreviewCardView({ card }: { card: PreviewCard }) {
         </div>
       )}
       {(status === 'EXECUTING' || status === 'APPROVED') && (
-        <p className="flex items-center gap-2 text-[13px] text-muted-foreground" aria-live="polite">
+        <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
           <Loader2 className="size-3.5 animate-spin" aria-hidden /> Signing and sending on testnet…
         </p>
       )}
-      {status === 'PREPARED' && <p className="text-[13px] text-muted-foreground">{card.summary}</p>}
+      {status === 'PREPARED' && <p className="text-sm text-muted-foreground">{card.summary}</p>}
       {status === 'CANCELLED' && (
-        <p className="text-[13px] text-muted-foreground">Cancelled — nothing was traded.</p>
+        <p className="text-sm text-muted-foreground">Cancelled — nothing was traded.</p>
       )}
     </CardShell>
   );
@@ -242,20 +242,20 @@ export function ApprovalCardView({ card }: { card: ApprovalCard }) {
             </Button>
           </div>
           {card.providerKind === 'dev' && (
-            <p className="text-[11px] text-caution">
+            <p className="text-xs text-caution">
               Approve (dev) — World ID step-up replaces this in Phase 10.
             </p>
           )}
         </div>
       )}
       {(status === 'APPROVED' || status === 'USED') && (
-        <p className="flex items-center gap-1.5 text-[13px] text-safe">
+        <p className="flex items-center gap-1.5 text-sm text-safe">
           <CheckCircle2 className="size-3.5" aria-hidden /> Approved by you — your agent{' '}
           {status === 'USED' ? 'is executing it.' : 'will run it now.'}
         </p>
       )}
       {closed && (
-        <p className="text-[13px] font-medium">
+        <p className="text-sm font-medium">
           {status === 'REJECTED'
             ? 'A different human tried to approve. Nothing was traded.'
             : status === 'EXPIRED'
@@ -287,7 +287,7 @@ export function RefusalCardView({ card }: { card: RefusalCard }) {
       }
     >
       <Reasons reasons={card.reasons} tone="danger" />
-      <p className="text-[13px] leading-relaxed text-muted-foreground">{card.summary}</p>
+      <p className="text-sm leading-relaxed text-muted-foreground">{card.summary}</p>
       {card.checks && <ChecksList checks={card.checks} />}
       {(card.suggestedRequest || card.suggestion) && (
         <div className="flex flex-wrap items-center gap-2">
@@ -368,7 +368,7 @@ export function PriceMovedCardView({ card }: { card: PriceMovedCard }) {
       label="Price moved"
       planId={card.actionPlanId}
     >
-      <p className="text-[13px]">{card.summary}</p>
+      <p className="text-sm">{card.summary}</p>
       <p className="text-xs text-muted-foreground tabular-nums">
         Preview {formatTokenAmount(card.previewAmount)} {card.symbol} → now{' '}
         {formatTokenAmount(card.currentAmount)} {card.symbol}{' '}
@@ -397,7 +397,7 @@ export function FailureCardView({ card }: { card: FailureCard }) {
       planId={card.actionPlanId}
       footer={<DecisionLogChip log={card.decisionLog} />}
     >
-      <p className="text-[13px]">{card.summary}</p>
+      <p className="text-sm">{card.summary}</p>
       {card.txs && <TxList txs={card.txs} />}
     </CardShell>
   );

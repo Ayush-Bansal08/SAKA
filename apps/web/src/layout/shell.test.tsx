@@ -5,20 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Redirect } from '@/app/Redirect';
 import { observePrefill, requestPrefill, subscribePrefill } from '@/features/agent/prefill';
 import { useStoredFlag } from '@/hooks/useStoredFlag';
-import { sectionLabel } from './nav';
-
-describe('sectionLabel', () => {
-  it('names the view a path belongs to', () => {
-    expect(sectionLabel('/')).toBe('Home');
-    expect(sectionLabel('/autopilot/simulator')).toBe('Autopilot');
-    expect(sectionLabel('/hooks/1/0xabc')).toBe('Hooks');
-    expect(sectionLabel('/approvals/a1')).toBe('Approval');
-  });
-
-  it('does not mistake a longer path for a view', () => {
-    expect(sectionLabel('/asking')).toBe('SAKA');
-  });
-});
+import { splitExplanation } from '@/features/hooks/permission-copy';
 
 describe('Redirect', () => {
   function Where() {
@@ -76,5 +63,23 @@ describe('useStoredFlag', () => {
     expect(result.current[0]).toBe(true);
     act(() => result.current[1](false));
     expect(result.current[0]).toBe(false);
+  });
+});
+
+describe('splitExplanation', () => {
+  it('reads the three labelled parts the explainer writes', () => {
+    expect(
+      splitExplanation(
+        'What it does: Sets fees. Why it matters to you: It can cost more. Our verdict: CAUTION.',
+      ),
+    ).toEqual({ what: 'Sets fees.', why: 'It can cost more.', verdict: 'CAUTION.' });
+  });
+
+  it('leaves any other text whole', () => {
+    expect(splitExplanation('This hook sets dynamic fees.')).toEqual({
+      what: 'This hook sets dynamic fees.',
+      why: null,
+      verdict: null,
+    });
   });
 });

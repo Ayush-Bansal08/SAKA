@@ -122,7 +122,7 @@ export function OnboardingWizard({
               ))}
             </div>
           )}
-          <div className="surface-highlight mt-6 rounded-lg border border-border bg-card p-5 sm:p-8">
+          <div className="glass mt-6 rounded-lg border border-border p-5 sm:p-8">
             {onboarding.isPending ? (
               <WizardSkeleton />
             ) : onboarding.isError ? (
@@ -377,7 +377,7 @@ function AddressCard({
       <div className="min-w-0 flex-1 text-center sm:text-left">
         <div className="text-xs font-medium text-muted-foreground">Agent wallet · {chain.name}</div>
         <div className="mt-1.5 flex items-center justify-center gap-1 sm:justify-start">
-          <code className="font-mono text-[13px] break-all text-foreground sm:text-sm">
+          <code className="font-mono text-sm break-all text-foreground sm:text-sm">
             {address}
           </code>
           <CopyButton value={address} label="Copy wallet address" className="size-7 shrink-0" />

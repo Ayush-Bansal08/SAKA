@@ -12,7 +12,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => api.close());
 
-async function open(page: Page, path = '/') {
+async function open(page: Page, path = '/app') {
   await page.addInitScript(() =>
     localStorage.setItem(
       'warden.session',
@@ -29,25 +29,61 @@ async function ask(page: Page, text: string) {
   await box.press('Enter');
 }
 
-test('home answers the main question, with real numbers and a way into every view', async ({
-  page,
-}) => {
+test('the workspace puts the agent and the portfolio first', async ({ page }) => {
   await open(page);
-  await expect(
-    page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: /What should SAKA do next/ })).toBeVisible();
   await expect(page.getByText('Portfolio value')).toBeVisible();
-  await expect(page.getByText('All-time P&L')).toBeVisible();
-  await expect(page.getByText('Agent spend today')).toBeVisible();
   await expect(page.getByText('waiting for you').first()).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}home.png` });
-  await page.getByRole('link', { name: 'Ask SAKA' }).click();
-  await expect(page).toHaveURL(/\/ask$/);
+  await page.screenshot({ path: `${SHOTS}workspace.png` });
+  await page.getByRole('link', { name: /Portfolio value/ }).click();
+  await expect(page).toHaveURL(/\/portfolio$/);
+});
+
+test('the landing page reacts to the cursor, and Start enters the app', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /DeFi that thinks/ })).toBeVisible();
+  await expect(page.getByText('Testnet only')).toBeVisible();
+  const lit = () =>
+    page.evaluate(() => {
+      const c = document.querySelector('canvas')!;
+      const { data } = c
+        .getContext('2d')!
+        .getImageData(c.width / 2 - 150, c.height / 2 - 150, 300, 300);
+      let sum = 0;
+      for (let i = 3; i < data.length; i += 4) sum += data[i]!;
+      return sum;
+    });
+  await page.waitForTimeout(600);
+  const before = await lit();
+  const size = page.viewportSize()!;
+  for (let i = 0; i < 40; i += 1) {
+    const a = i / 4;
+    await page.mouse.move(size.width / 2 + Math.cos(a) * 110, size.height / 2 + Math.sin(a) * 110);
+    await page.waitForTimeout(25);
+  }
+  expect(await lit()).not.toBe(before);
+  await page.screenshot({ path: `${SHOTS}landing.png` });
+  await page.getByRole('link', { name: 'Start' }).click();
+  await expect(page).toHaveURL(/\/app$/);
+});
+
+test('reduced motion: the landing page holds one still frame', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Start' })).toBeVisible();
+  const pixels = () =>
+    page.evaluate(() => {
+      const c = document.querySelector('canvas')!;
+      return c.toDataURL().length;
+    });
+  const first = await pixels();
+  await page.waitForTimeout(500);
+  expect(await pixels()).toBe(first);
 });
 
 test('"swap $5" → preview with countdown → receipt in place with 0G proof', async ({ page }) => {
-  await open(page, '/ask');
-  await expect(page.getByRole('heading', { name: /I'm your agent/ })).toBeVisible();
+  await open(page, '/app');
+  await expect(page.getByRole('heading', { name: /What should SAKA do next/ })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}ask-empty.png` });
   await ask(page, 'Swap $5 ETH to USDC');
   const preview = page.getByLabel('Action preview');
@@ -66,7 +102,7 @@ test('"swap $5" → preview with countdown → receipt in place with 0G proof', 
 });
 
 test('"swap $60" → approval → Reject → denied, nothing traded', async ({ page }) => {
-  await open(page, '/ask');
+  await open(page, '/app');
   await ask(page, 'Swap $60 ETH to USDC');
   const card = page.getByLabel('Approval needed').last();
   await expect(card.getByText('60 / max 25')).toBeVisible({ timeout: 15_000 });
@@ -79,7 +115,7 @@ test('"swap $60" → approval → Reject → denied, nothing traded', async ({ p
 });
 
 test('refusal card renders the suggestion chip and it pre-fills the composer', async ({ page }) => {
-  await open(page, '/ask');
+  await open(page, '/app');
   await ask(page, 'Swap $500 ETH to USDC');
   const card = page.getByLabel('Refused').last();
   await expect(card.getByText('7.2 / max 5')).toBeVisible({ timeout: 15_000 });
@@ -91,7 +127,7 @@ test('refusal card renders the suggestion chip and it pre-fills the composer', a
 });
 
 test('activity, autopilot, tablet and 375px mobile layouts', async ({ page }) => {
-  await open(page, '/ask');
+  await open(page, '/app');
   await ask(page, 'Is USDC safe?');
   await expect(page.getByText('Looks safe', { exact: true })).toBeVisible({ timeout: 15_000 });
   await page.screenshot({ path: `${SHOTS}ask-desktop.png` });
@@ -104,7 +140,7 @@ test('activity, autopilot, tablet and 375px mobile layouts', async ({ page }) =>
   await expect(page).toHaveURL(/\/autopilot$/);
   await expect(page.getByText('Needs your approval')).toBeVisible();
   await page.setViewportSize({ width: 1024, height: 800 });
-  await page.goto('/');
+  await page.goto('/app');
   await page.getByRole('button', { name: 'Open live activity' }).click();
   await expect(
     page.getByRole('dialog').getByRole('toolbar', { name: 'Filter activity' }),
@@ -113,9 +149,9 @@ test('activity, autopilot, tablet and 375px mobile layouts', async ({ page }) =>
   await page.screenshot({ path: `${SHOTS}home-tablet.png` });
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/');
+  await page.goto('/app');
   const tabs = page.getByRole('navigation', { name: 'Main' });
-  await expect(tabs.getByRole('link', { name: 'Ask' })).toBeVisible();
+  await expect(tabs.getByRole('link', { name: 'Agent' })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth,
   );
@@ -160,7 +196,7 @@ test('inbox: pinned brief, red alert, Yes / Change / No, nav badge; settings con
   await expect(page.getByLabel('1 waiting for you').first()).toBeVisible();
 
   await red.getByRole('button', { name: 'Change', exact: true }).click();
-  await expect(page).toHaveURL(/\/ask$/);
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByLabel('Message your agent').locator('textarea')).toHaveValue(
     'Exit 100% of position pos1',
   );
@@ -206,13 +242,13 @@ test('LP actions and New rule reach the chat from their new views', async ({ pag
   await expect(page.getByText('In range')).toBeVisible();
   await page.screenshot({ path: `${SHOTS}portfolio.png`, fullPage: true });
   await page.getByRole('button', { name: 'Rebalance' }).click();
-  await expect(page).toHaveURL(/\/ask$/);
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByLabel('Message your agent').locator('textarea')).toHaveValue(
     'Rebalance my ETH/USDC position lp_1 around the current price',
   );
   await page.goto('/autopilot/mandate');
   await page.getByRole('button', { name: 'New rule' }).click();
-  await expect(page).toHaveURL(/\/ask$/);
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByLabel('Message your agent').locator('textarea')).toHaveValue(
     'Sell half if ETH goes up 2%',
   );
@@ -238,7 +274,7 @@ test('simulator: old path redirects, scenarios run, no action reads as deliberat
 });
 
 test('show agent internals opens the trace beside the chat and is remembered', async ({ page }) => {
-  await open(page, '/ask');
+  await open(page, '/app');
   const internals = page.getByRole('switch', { name: 'Show agent internals' });
   await expect(page.getByRole('complementary', { name: 'Agent trace' })).toHaveCount(0);
   await internals.click();
@@ -263,7 +299,7 @@ for (const width of [360, 768, 1024, 1440]) {
     await open(page);
     for (const path of [
       '/',
-      '/ask',
+      '/app',
       '/autopilot',
       '/autopilot/mandate',
       '/autopilot/simulator',
@@ -287,16 +323,20 @@ for (const width of [360, 768, 1024, 1440]) {
   });
 }
 
-test('hooks stays reachable from the account menu on a phone', async ({ page }) => {
+test('hooks is one tap away on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await open(page);
-  await page.getByRole('button', { name: /Account menu/ }).click();
-  await page.getByRole('menuitem', { name: 'Hooks' }).click();
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Hooks' }).click();
   await expect(page).toHaveURL(/\/hooks$/);
 });
 
+test('old /ask links land on the agent', async ({ page }) => {
+  await open(page, '/ask');
+  await expect(page).toHaveURL(/\/app$/);
+});
+
 test('signed out: the connect screen, not a broken dashboard', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/app');
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Continue/ })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
@@ -316,7 +356,7 @@ test('on a phone the plan drawer is a bottom sheet that closes with Escape', asy
 
 test('reduced motion stops the breathing glow', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await open(page, '/ask');
+  await open(page, '/app');
   const name = await page.evaluate(() => {
     const el = document.createElement('span');
     el.className = 'agent-breathe';
@@ -340,7 +380,7 @@ test('the keyboard reaches the tabs and shows a focus ring', async ({ page }) =>
 });
 
 test('the approval link the API sends still works, and Reject trades nothing', async ({ page }) => {
-  await open(page, '/ask');
+  await open(page, '/app');
   await ask(page, 'Swap $60 ETH to USDC');
   await expect(
     page
@@ -401,7 +441,7 @@ test('an unknown path is the not-found page, inside the shell', async ({ page })
   await open(page, '/nowhere');
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   await page.getByRole('link', { name: 'Go home' }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/app$/);
 });
 
 test('the API being down shows a clear error with a retry', async ({ page }) => {

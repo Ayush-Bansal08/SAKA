@@ -8,7 +8,7 @@ const MODE: Record<'LIVE' | 'SIMULATED' | 'PAPER', BadgeTone> = {
 
 export function ModeBadge({ mode }: { mode: keyof typeof MODE }) {
   return (
-    <Badge tone={MODE[mode]} className="font-mono tracking-[0.08em]">
+    <Badge tone={MODE[mode]} className="tracking-[0.04em]">
       {mode === 'LIVE' && <span className="size-1.5 rounded-full bg-safe" aria-hidden />}
       {mode}
     </Badge>

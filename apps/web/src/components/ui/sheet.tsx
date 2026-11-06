@@ -25,7 +25,7 @@ export function SheetContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed z-50 flex w-full flex-col border-border-strong bg-card outline-none',
+          'fixed z-50 flex w-full flex-col border-border-strong bg-popover/95 backdrop-blur-xl outline-none',
           'inset-x-0 bottom-0 max-h-[90dvh] rounded-t-xl border-t sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:max-w-[640px] sm:rounded-none sm:border-t-0 sm:border-l',
           'data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:duration-200 sm:data-[state=open]:slide-in-from-right sm:data-[state=closed]:slide-out-to-right',
           className,

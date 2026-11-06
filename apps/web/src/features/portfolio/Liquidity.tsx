@@ -39,7 +39,7 @@ export function RangeBar({ p }: { p: LpPositionView }) {
           style={{ left: `${g.marker}%` }}
         />
       </div>
-      <div className="mt-1 flex justify-between text-[10.5px] text-subtle-foreground tabular-nums">
+      <div className="mt-1 flex justify-between text-xs text-subtle-foreground tabular-nums">
         <span>{formatPrice(p.priceLower)}</span>
         <span className={g.inRange ? 'text-safe' : 'text-caution'}>
           now {formatPrice(p.priceCurrent)}
@@ -91,7 +91,7 @@ function PositionCard({ p, startOpen }: { p: LpPositionView; startOpen: boolean 
             {pnl !== null && (
               <span
                 className={cn(
-                  'block text-[11px] tabular-nums',
+                  'block text-xs tabular-nums',
                   pnl >= 0 ? 'text-safe' : 'text-danger',
                 )}
               >
@@ -112,7 +112,7 @@ function PositionCard({ p, startOpen }: { p: LpPositionView; startOpen: boolean 
       {open && (
         <div id={bodyId} className="px-3.5 pb-3.5">
           <RangeBar p={p} />
-          <p className="mt-2 text-[11px] text-muted-foreground tabular-nums">
+          <p className="mt-2 text-xs text-muted-foreground tabular-nums">
             {formatTokenAmount(p.amount0)} {p.token0.symbol} + {formatTokenAmount(p.amount1)}{' '}
             {p.token1.symbol}
             {fees.length ? ` · fees ${fees.join(' + ')}` : ''}

@@ -40,8 +40,8 @@ export function Disclosure({
           <span
             className={cn(
               technical
-                ? 'micro-label text-subtle-foreground group-hover:text-muted-foreground'
-                : 'text-xs font-medium text-muted-foreground group-hover:text-foreground',
+                ? 'text-sm font-medium text-subtle-foreground group-hover:text-muted-foreground'
+                : 'text-sm font-medium text-muted-foreground group-hover:text-foreground',
             )}
           >
             {title}

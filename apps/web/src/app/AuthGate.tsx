@@ -17,9 +17,9 @@ function Splash({ label }: { label: string }) {
     <div
       role="status"
       aria-label={label}
-      className="dot-matrix flex min-h-dvh items-center justify-center"
+      className="flex min-h-dvh items-center justify-center"
     >
-      <Wordmark className="h-16 animate-pulse" />
+      <Wordmark className="agent-breathe h-12" />
       <span className="sr-only">{label}…</span>
     </div>
   );

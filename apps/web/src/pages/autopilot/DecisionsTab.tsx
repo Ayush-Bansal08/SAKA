@@ -35,9 +35,7 @@ function ApprovalRow({ a, devApprove }: { a: PendingApproval; devApprove: boolea
         <p className="font-medium [overflow-wrap:anywhere]">
           {a.summary.charAt(0).toUpperCase() + a.summary.slice(1)}
         </p>
-        <p className="mt-0.5 text-[13px] text-muted-foreground [overflow-wrap:anywhere]">
-          {a.reason}
-        </p>
+        <p className="mt-0.5 text-sm text-muted-foreground [overflow-wrap:anywhere]">{a.reason}</p>
         <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
           <span className="text-base font-medium tabular-nums">{usd(a.amountUsd)}</span>
           <Badge tone={left < 60 ? 'danger' : 'warm'} icon={<Clock aria-hidden />}>
@@ -116,7 +114,7 @@ function Approvals() {
         </ul>
       )}
       {pending.data?.devApproveAvailable && items.length > 0 && (
-        <p className="border-t border-border px-5 py-2 text-[11px] text-caution">
+        <p className="border-t border-border px-5 py-2 text-xs text-caution">
           Approve (dev) — World ID step-up replaces this in Phase 10.
         </p>
       )}

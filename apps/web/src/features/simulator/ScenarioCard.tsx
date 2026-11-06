@@ -25,7 +25,7 @@ export function ScenarioCard({
           <CardIndex value={index} />
           <div className="min-w-0 flex-1">
             <p className="text-h3 font-medium [overflow-wrap:anywhere]">{scenario.label}</p>
-            <p className="mt-1.5 text-[13px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
+            <p className="mt-1.5 text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]">
               {scenario.description}
             </p>
           </div>

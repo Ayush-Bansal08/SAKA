@@ -79,7 +79,7 @@ function Section({
 
 function Json({ value }: { value: unknown }) {
   return (
-    <pre className="max-h-80 overflow-auto rounded-md border border-border bg-background/60 p-3 font-mono text-[11px] leading-relaxed text-foreground/80">
+    <pre className="max-h-80 overflow-auto rounded-md border border-border bg-background/60 p-3 font-mono text-xs leading-relaxed text-foreground/80">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -292,7 +292,7 @@ function PlanBody({ plan }: { plan: PlanView }) {
       <Section icon={<Send />} title="Transactions">
         {plan.calls.length > 0 && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] text-muted-foreground">
+            <p className="mb-1.5 text-xs text-muted-foreground">
               Unsigned calls built by the Uniswap MCP server (previewed)
             </p>
             <ul className="space-y-1.5">
@@ -305,7 +305,7 @@ function PlanBody({ plan }: { plan: PlanView }) {
                   <span className="text-muted-foreground">to</span>
                   <AddressChip address={c.to} />
                   {c.selector && (
-                    <code className="rounded bg-surface-2 px-1 font-mono text-[11px]">
+                    <code className="rounded bg-surface-2 px-1 font-mono text-xs">
                       {c.selector}
                     </code>
                   )}
@@ -398,7 +398,7 @@ export function PlanDrawer() {
           ) : (
             <PlanBody plan={plan.data} />
           )}
-          <div className="flex items-center gap-1.5 border-t border-border px-5 py-3 text-[11px] text-subtle-foreground">
+          <div className="flex items-center gap-1.5 border-t border-border px-5 py-3 text-xs text-subtle-foreground">
             <ScrollText className="size-3" aria-hidden /> Plan {planId}
           </div>
         </SheetContent>

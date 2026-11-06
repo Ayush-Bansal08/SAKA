@@ -70,7 +70,7 @@ export function useSuggestionAction() {
       announce(r);
       if (r.result === 'CHANGED' && r.prefill) {
         requestPrefill(r.prefill);
-        void navigate('/ask');
+        void navigate('/app');
       }
     },
     onError: (err) => {

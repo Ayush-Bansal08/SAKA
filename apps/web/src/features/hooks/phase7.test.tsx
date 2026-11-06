@@ -119,7 +119,8 @@ describe('HookCard', () => {
     expect(screen.getByText('This hook sets dynamic fees on every swap.')).toBeInTheDocument();
     expect(screen.getByText('Can change your swap amount')).toBeInTheDocument();
     expect(screen.getByText('Can change swap fees')).toBeInTheDocument();
-    expect(screen.getByText(/TVL \$125K/)).toBeInTheDocument();
+    expect(screen.getByText('TVL')).toBeInTheDocument();
+    expect(screen.getByText('$125K')).toBeInTheDocument();
   });
 
   it('"Ask agent" and "Try $5" prefill the chat and go to the cockpit; market hooks cannot be tried', async () => {
@@ -130,7 +131,7 @@ describe('HookCard', () => {
     expect(got.at(-1)).toBe(
       'Swap $5 ETH to USDC through the pool with hook 0x1111111111111111111111111111111111110080',
     );
-    expect(ui.location()).toBe('/ask');
+    expect(ui.location()).toBe('/app');
     await userEvent.click(screen.getByRole('button', { name: /Ask agent about this/ }));
     expect(got.at(-1)).toBe('Explain hook 0x1111111111111111111111111111111111110080');
     sub.unsubscribe();

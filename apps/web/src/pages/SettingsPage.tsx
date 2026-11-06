@@ -30,8 +30,7 @@ export function SettingsPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Settings"
-        title="Your account"
+        title="Settings"
         description="Your identity, your agent's wallet and your alerts."
       />
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">

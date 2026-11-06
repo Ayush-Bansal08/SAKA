@@ -5,9 +5,9 @@ import { AskPage } from '@/pages/AskPage';
 import { AutopilotPage } from '@/pages/autopilot/AutopilotPage';
 import { DecisionsTab } from '@/pages/autopilot/DecisionsTab';
 import { MandateTab } from '@/pages/autopilot/MandateTab';
-import { HomePage } from '@/pages/HomePage';
 import { HookDetailPage } from '@/pages/HookDetailPage';
 import { HooksPage } from '@/pages/HooksPage';
+import { LandingPage } from '@/pages/LandingPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { PortfolioPage } from '@/pages/PortfolioPage';
 import { SettingsPage } from '@/pages/SettingsPage';
@@ -17,12 +17,13 @@ import { Redirect } from './Redirect';
 import { RouteError } from './RouteError';
 
 export const router = createBrowserRouter([
+  // The front door needs no session, so it stands outside the gate.
+  { path: '/', element: <LandingPage />, errorElement: <RouteError /> },
   {
     element: <AuthGate />,
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: 'ask', element: <AskPage /> },
+      { path: 'app', element: <AskPage /> },
       {
         path: 'autopilot',
         element: <AutopilotPage />,
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: 'settings', element: <SettingsPage /> },
       { path: 'approvals/:id', element: <ApprovalPage /> },
       // Old paths: bookmarks, toasts and older links keep working.
+      { path: 'ask', element: <Redirect to="/app" /> },
       { path: 'inbox', element: <Redirect to="/autopilot" /> },
       { path: 'inbox/simulator', element: <Redirect to="/autopilot/simulator" /> },
       { path: '*', element: <NotFoundPage /> },

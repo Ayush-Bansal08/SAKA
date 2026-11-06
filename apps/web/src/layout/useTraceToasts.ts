@@ -24,7 +24,7 @@ export function useTraceToasts(): void {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const seen = useRef<Set<string> | null>(null);
-  const inChat = pathname === '/ask';
+  const inChat = pathname === '/app';
 
   useEffect(() => {
     if (seen.current === null) {

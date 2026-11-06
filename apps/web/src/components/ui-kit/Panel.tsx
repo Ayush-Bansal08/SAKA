@@ -25,7 +25,7 @@ export function Panel({
     <section
       aria-labelledby={headingId}
       className={cn(
-        'surface-highlight flex min-h-0 flex-col rounded-lg border border-border bg-card text-card-foreground',
+        'glass flex min-h-0 flex-col rounded-lg border border-border text-card-foreground',
         className,
       )}
       {...props}
@@ -35,10 +35,10 @@ export function Panel({
           <div className="flex min-w-0 items-center gap-2.5">
             {icon && <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>}
             <div className="min-w-0">
-              <h2 id={headingId} className="truncate text-sm font-medium tracking-tight">
+              <h2 id={headingId} className="truncate text-[15px] font-semibold tracking-tight">
                 {title}
               </h2>
-              {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+              {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
             </div>
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

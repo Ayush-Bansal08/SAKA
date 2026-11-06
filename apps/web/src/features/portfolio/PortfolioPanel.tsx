@@ -36,9 +36,8 @@ export function PortfolioView({ user }: { user: UserView }) {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Portfolio"
-        title="What you"
-        accent="own"
+        title="Portfolio"
+        description="What your agent wallet holds, and how much risk it carries."
         actions={
           data ? (
             <RefreshButton
@@ -304,7 +303,7 @@ function TokenRow({ token: t }: { token: PortfolioTokenView }) {
     <li className="flex items-center gap-3 py-2.5">
       <span
         className={cn(
-          'flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[11px] font-semibold text-muted-foreground',
+          'flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-xs font-semibold text-muted-foreground',
         )}
         aria-hidden
       >
@@ -376,7 +375,7 @@ function RiskMeterView({ risk }: { risk: RiskMeter }) {
   return (
     <section
       aria-labelledby="risk-title"
-      className="surface-highlight rounded-lg border border-border bg-card p-5"
+      className="glass rounded-lg border border-border p-5"
     >
       <div className="flex items-center justify-between gap-2">
         <h3 id="risk-title" className="micro-label text-subtle-foreground">
@@ -427,7 +426,7 @@ function RiskMeterView({ risk }: { risk: RiskMeter }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className={cn('text-xl font-semibold tabular', tone.text)}>{risk.score}</span>
-            <span className="text-[10px] text-subtle-foreground">/ 100</span>
+            <span className="text-xs text-subtle-foreground">/ 100</span>
           </div>
         </div>
         <div className="min-w-0 flex-1">
@@ -463,7 +462,7 @@ function LimitsBar({ data, profileLabel }: { data: PortfolioResponse; profileLab
   return (
     <section
       aria-labelledby="limits-title"
-      className="surface-highlight rounded-lg border border-border bg-card p-5"
+      className="glass rounded-lg border border-border p-5"
     >
       <div className="flex items-center justify-between gap-2">
         <h3 id="limits-title" className="micro-label text-subtle-foreground">
@@ -501,7 +500,7 @@ function LimitsBar({ data, profileLabel }: { data: PortfolioResponse; profileLab
 
 function PriceSource({ data }: { data: PortfolioResponse }) {
   return (
-    <div className="space-y-1 px-1 text-[11px] text-subtle-foreground">
+    <div className="space-y-1 px-1 text-xs text-subtle-foreground">
       <p>USD values: {data.priceSource}</p>
       {data.unpriced.length > 0 && <p>Not priced: {data.unpriced.join(', ')}</p>}
       {data.warnings.map((w) => (

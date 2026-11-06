@@ -14,7 +14,7 @@ export function NotFoundPage() {
         description="That page doesn't exist. Head back home."
         action={
           <Button asChild variant="secondary">
-            <Link to="/">Go home</Link>
+            <Link to="/app">Go home</Link>
           </Button>
         }
       />

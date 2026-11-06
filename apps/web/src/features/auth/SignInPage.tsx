@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Banner } from '@/components/ui-kit';
+import { FlowField } from '@/components/ui-kit/FlowField';
 import { DevBanner } from '@/layout/DevBanner';
 import { usesDevProviders } from '@/layout/dev-mode';
 import { Wordmark } from '@/layout/Logo';
@@ -24,13 +25,14 @@ const PILLARS = [
 
 export function SignInPage({ providers }: { providers: ProvidersResponse }) {
   return (
-    <div className="dot-matrix flex min-h-dvh flex-col">
+    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden">
+      <FlowField className="absolute inset-0 -z-10" />
       {usesDevProviders(providers) && <DevBanner />}
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex flex-col items-center text-center">
             <h1>
-              <Wordmark className="h-20" />
+              <Wordmark className="mx-auto h-12" />
               <span className="sr-only">{providers.appName}</span>
             </h1>
             <p className="mt-4 text-[15px] leading-6 text-muted-foreground">
@@ -39,7 +41,7 @@ export function SignInPage({ providers }: { providers: ProvidersResponse }) {
             </p>
           </div>
 
-          <div className="surface-highlight rounded-lg border border-border-strong bg-card/90 p-6 backdrop-blur">
+          <div className="glass rounded-lg border border-border-strong p-6">
             {providers.identity === 'dev' ? (
               <DevSignInForm />
             ) : (
