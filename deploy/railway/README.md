@@ -43,3 +43,26 @@ The image also has a generic entry, `node dist/main.js`, that picks the process 
 
 > Production refuses to boot with dev identity/approval providers. Until World ID lands in
 > PHASE 10, there is no production mode to deploy (by design).
+
+## Staging deploy (current hosted mode, until PHASE 10)
+
+The steps above describe the production target. Until World ID lands, the hosted app runs as
+staging. Use these values instead on `api`, `worker` and `bot`:
+
+```env
+NODE_ENV=development
+LOG_FORMAT=json
+TRUST_PROXY=true
+AUTH_MODE=dev
+APPROVAL_MODE=dev
+ALLOW_DEV_PROVIDERS=true
+MCP_URL=http://mcp.railway.internal:3002/mcp
+```
+
+On `mcp`, leave `NODE_ENV` unset and add `PORT=3002` and `MCP_HOST=::`.
+
+- `LOG_FORMAT=json` is required: `pino-pretty` is a dev dependency and is not in the image.
+- `TRUST_PROXY=true` gives each visitor their own rate-limit bucket behind Railway's proxy.
+- In this mode the `bot` service stays running and long-polls Telegram, so
+  `TELEGRAM_WEBHOOK_SECRET` is not needed. Do not run the same bot token locally at the same time.
+- Dev sign-in has no password: anyone who enters a name gets that account. Testnet funds only.

@@ -1,0 +1,4 @@
+# HTTPS for the API. Caddy gets and renews the certificate on its own.
+{$API_DOMAIN} {
+	reverse_proxy api:3001
+}

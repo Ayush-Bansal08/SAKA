@@ -117,6 +117,11 @@ export const EnvSchema = z.object({
   ALLOW_DEV_PROVIDERS: booleanString.default('false'),
   /** Demo market simulator: its button and its routes exist only when this is on. */
   ENABLE_DEMO_SIMULATOR: booleanString.default('false'),
+  /**
+   * Read the client IP from X-Forwarded-For. Always on in production. Set it on any non-production
+   * deploy behind a proxy, or every visitor shares one rate-limit bucket.
+   */
+  TRUST_PROXY: booleanString.default('false'),
 
   // --- admin ----------------------------------------------------------------
   ADMIN_TOKEN: z.string().min(24, 'must be at least 24 characters'),

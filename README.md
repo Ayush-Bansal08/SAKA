@@ -113,6 +113,8 @@ openssl rand -base64 32   # ENCRYPTION_KEY
 openssl rand -hex 32      # ADMIN_TOKEN, MCP_RESUME_SECRET and MCP_AUTH_TOKEN (one each)
 ```
 
+Deploying it live: see [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Try it
 
 1. **Agent → "Swap $5 ETH to USDC".** Watch the preview, the countdown and the receipt with its 0G proof.

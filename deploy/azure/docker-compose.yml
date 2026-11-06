@@ -1,0 +1,150 @@
+# SAKA on one VM: every backend process, Postgres, Redis and Caddy (HTTPS).
+# Run from this folder:  docker compose up -d --build
+# Settings come from deploy/azure/.env (git-ignored). See docs/DEPLOY.md.
+name: saka
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
+x-backend: &backend
+  image: saka-api:latest
+  build:
+    context: ../..
+    dockerfile: apps/api/Dockerfile
+  env_file: .env
+  environment:
+    # Staging until World ID lands: production refuses to boot with dev providers.
+    NODE_ENV: development
+    # Required: pino-pretty is a dev dependency and is not in the image.
+    LOG_FORMAT: json
+    TRUST_PROXY: 'true'
+    AUTH_MODE: dev
+    APPROVAL_MODE: dev
+    ALLOW_DEV_PROVIDERS: 'true'
+    API_URL: https://${API_DOMAIN:?set API_DOMAIN in deploy/azure/.env}
+    DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/azure/.env}@postgres:5432/warden
+    REDIS_URL: redis://redis:6379
+    MCP_URL: http://mcp:3002/mcp
+  logging: *logging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/azure/.env}
+      POSTGRES_DB: warden
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d warden']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    # BullMQ needs noeviction; appendonly keeps queued jobs across restarts.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+
+  mcp:
+    image: saka-mcp:latest
+    build:
+      context: ../..
+      dockerfile: packages/uniswap-agent-mcp/Dockerfile
+    # Only what the MCP server uses, so it never sees wallet or 0G secrets.
+    environment:
+      NODE_ENV: production
+      PORT: '3002'
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set MCP_AUTH_TOKEN in deploy/azure/.env}
+      MCP_RESUME_SECRET: ${MCP_RESUME_SECRET:?set MCP_RESUME_SECRET in deploy/azure/.env}
+      UNISWAP_API_KEY: ${UNISWAP_API_KEY:?set UNISWAP_API_KEY in deploy/azure/.env}
+      EXECUTION_CHAIN_ID: ${EXECUTION_CHAIN_ID:-11155111}
+      EXECUTION_RPC_URL: ${EXECUTION_RPC_URL:?set EXECUTION_RPC_URL in deploy/azure/.env}
+      MAINNET_RPC_URL: ${MAINNET_RPC_URL:?set MAINNET_RPC_URL in deploy/azure/.env}
+      UNISWAP_API_BASE_URL: ${UNISWAP_API_BASE_URL:-}
+      UNISWAP_LP_API_BASE_URL: ${UNISWAP_LP_API_BASE_URL:-}
+      UNISWAP_V4_SUBGRAPH_ID: ${UNISWAP_V4_SUBGRAPH_ID:-}
+      UNISWAP_BLOCKED_POOLS: ${UNISWAP_BLOCKED_POOLS:-}
+      THEGRAPH_API_KEY: ${THEGRAPH_API_KEY:-}
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      TOKEN_ALLOWLIST_JSON: ${TOKEN_ALLOWLIST_JSON:-}
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    <<: *backend
+    command: ['node', 'dist/server.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mcp:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: ['node', 'dist/worker.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mcp:
+        condition: service_started
+    restart: unless-stopped
+
+  bot:
+    <<: *backend
+    command: ['node', 'dist/bot.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: on-failure:5
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in deploy/azure/.env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

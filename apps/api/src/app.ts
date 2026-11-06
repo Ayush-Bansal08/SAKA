@@ -118,7 +118,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   const app = Fastify({
     logger: loggerOptions(env, 'api'),
-    trustProxy: env.NODE_ENV === 'production',
+    trustProxy: env.NODE_ENV === 'production' || env.TRUST_PROXY,
     bodyLimit: 1_048_576,
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
