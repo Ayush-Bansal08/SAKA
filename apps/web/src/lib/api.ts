@@ -50,7 +50,7 @@ export async function api<T>(path: string, options: RequestOptions<T> = {}): Pro
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    throw new ApiError(0, 'NETWORK', `Can't reach the Warden API at ${API_URL}.`);
+    throw new ApiError(0, 'NETWORK', `Can't reach the SAKA API at ${API_URL}.`);
   }
 
   const requestId = res.headers.get('x-request-id') ?? undefined;

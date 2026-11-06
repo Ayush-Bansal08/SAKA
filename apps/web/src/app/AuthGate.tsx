@@ -32,7 +32,7 @@ export function AuthGate() {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4">
         <ErrorState
-          title="Can't reach Warden"
+          title="Can't reach SAKA"
           description={
             err instanceof ApiError && err.isNetwork
               ? `The API at ${API_URL} is not responding. Make sure it is running, then try again.`

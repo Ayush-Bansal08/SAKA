@@ -731,7 +731,7 @@ export async function startMockApi(port: number): Promise<MockApi> {
           res,
           200,
           ProvidersResponseSchema.parse({
-            appName: 'Warden',
+            appName: 'SAKA',
             identity: 'dev',
             approvals: 'dev',
             executionChainId: 11155111,

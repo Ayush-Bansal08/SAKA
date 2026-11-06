@@ -85,7 +85,7 @@ export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   HOST: z.string().min(1).default('0.0.0.0'),
-  APP_NAME: z.string().trim().min(1).max(40).default('Warden'),
+  APP_NAME: z.string().trim().min(1).max(40).default('SAKA'),
   WEB_URL: urlWithoutTrailingSlash,
   API_URL: urlWithoutTrailingSlash,
   DATABASE_URL: z

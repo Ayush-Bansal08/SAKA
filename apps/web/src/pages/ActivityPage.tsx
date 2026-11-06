@@ -105,7 +105,7 @@ export function ActivityPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `warden-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `saka-activity-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`Exported ${all.length} action${all.length === 1 ? '' : 's'}.`);

@@ -337,7 +337,7 @@ function WalletStep({ data, onContinue }: { data: OnboardingResponse; onContinue
           <ShieldCheck className="size-3.5 shrink-0 text-safe" aria-hidden />
           {data.wallet.policyId
             ? 'Privy policy attached: only Uniswap contracts, Permit2 and allowlisted tokens.'
-            : 'Guarded by Warden’s policy engine (Privy policies are not enabled on this plan).'}
+            : 'Guarded by SAKA’s policy engine (Privy policies are not enabled on this plan).'}
         </li>
         <li className="flex items-center gap-2">
           <Sparkles className="size-3.5 shrink-0 text-agent" aria-hidden />
