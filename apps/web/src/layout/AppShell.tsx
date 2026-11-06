@@ -1,4 +1,4 @@
-import { AUTO_ACT_DETECTORS, chainMeta, Decimal, usd } from '@warden/shared';
+import { chainMeta, Decimal, usd } from '@warden/shared';
 import type { ProvidersResponse, UserView } from '@warden/shared';
 import { Activity, PanelLeftClose, PanelLeftOpen, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -7,10 +7,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { SimpleTooltip } from '@/components/ui/tooltip';
 import { observePrefill } from '@/features/agent/prefill';
 import { usePriceOverrides } from '@/features/hooks/hooks';
-import { useSuggestions } from '@/features/inbox/hooks';
-import { usePendingApprovals } from '@/features/plan/hooks';
 import { PlanDrawer } from '@/features/plan/PlanDrawer';
-import { usePortfolio, useSettings } from '@/features/portfolio/hooks';
+import { usePortfolio } from '@/features/portfolio/hooks';
 import { LiveActivity, StreamStatusPill } from '@/features/trace/LiveActivity';
 import { useTraceStream } from '@/features/trace/trace-context';
 import { useStoredFlag } from '@/hooks/useStoredFlag';
@@ -19,6 +17,7 @@ import { DevBanner } from './DevBanner';
 import { usesDevProviders } from './dev-mode';
 import { LogoMark, Wordmark } from './Logo';
 import { HOOKS_ITEM, NAV_ITEMS, sectionLabel, SETTINGS_ITEM, type NavItem } from './nav';
+import { useAutoActCount, usePendingCount } from './shell-hooks';
 import { UserMenu } from './UserMenu';
 import { useTraceToasts } from './useTraceToasts';
 
@@ -162,21 +161,7 @@ function NavBadge({ count, rail }: { count: number; rail: boolean }) {
   );
 }
 
-/** Everything waiting for the human: approvals plus open suggestions. */
-export function usePendingCount(): number {
-  const approvals = usePendingApprovals().data?.approvals.length ?? 0;
-  return approvals + (useSuggestions().data?.openCount ?? 0);
-}
-
-function SideLink({
-  item,
-  rail,
-  badge = 0,
-}: {
-  item: NavItem;
-  rail: boolean;
-  badge?: number;
-}) {
+function SideLink({ item, rail, badge = 0 }: { item: NavItem; rail: boolean; badge?: number }) {
   return (
     <NavLink
       to={item.to}
@@ -199,14 +184,6 @@ function SideLink({
   );
 }
 
-/** How many of the five auto-act switches are on: the honest "Autopilot" status. */
-export function useAutoActCount(): { on: number; total: number } | null {
-  const settings = useSettings();
-  if (!settings.data) return null;
-  const on = AUTO_ACT_DETECTORS.filter((d) => settings.data.autoAct[d]).length;
-  return { on, total: AUTO_ACT_DETECTORS.length };
-}
-
 function AutoActChip({ rail }: { rail: boolean }) {
   const count = useAutoActCount();
   if (!count) return null;
@@ -220,7 +197,9 @@ function AutoActChip({ rail }: { rail: boolean }) {
       )}
     >
       <Zap className={cn('size-3.5 shrink-0', count.on > 0 && 'text-agent')} aria-hidden />
-      <span className={cn('micro-label text-muted-foreground', rail ? 'hidden' : 'hidden lg:inline')}>
+      <span
+        className={cn('micro-label text-muted-foreground', rail ? 'hidden' : 'hidden lg:inline')}
+      >
         Auto-act {count.on}/{count.total}
       </span>
       <span
@@ -280,11 +259,7 @@ function SideNav({ providers }: { providers: ProvidersResponse }) {
       <ul className="space-y-1">
         {NAV_ITEMS.map((item) => (
           <li key={item.to}>
-            <SideLink
-              item={item}
-              rail={collapsed}
-              badge={item.to === '/autopilot' ? pending : 0}
-            />
+            <SideLink item={item} rail={collapsed} badge={item.to === '/autopilot' ? pending : 0} />
           </li>
         ))}
         <li className="pt-3">

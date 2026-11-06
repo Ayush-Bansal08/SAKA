@@ -1,5 +1,5 @@
 /**
- * Toasts for executed / refused / approval-needed when the human is not on the cockpit
+ * Toasts for executed / refused / approval-needed when the human is not in the chat
  * (PHASE 06 §5), and for RED alerts wherever they are (PHASE 08 §3). Only events that arrive
  * after mount; replayed history never toasts.
  */
@@ -24,7 +24,7 @@ export function useTraceToasts(): void {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const seen = useRef<Set<string> | null>(null);
-  const onCockpit = pathname === '/';
+  const inChat = pathname === '/ask';
 
   useEffect(() => {
     if (seen.current === null) {
@@ -38,11 +38,11 @@ export function useTraceToasts(): void {
       if (kind === 'red') {
         toast.error(e.title, {
           description: e.detail?.slice(0, 140),
-          action: { label: 'Open inbox', onClick: () => void navigate('/inbox') },
+          action: { label: 'Open Autopilot', onClick: () => void navigate('/autopilot') },
         });
         continue;
       }
-      if (onCockpit) continue;
+      if (inChat) continue;
       if (kind === 'executed')
         toast.success(e.title, { description: 'Receipt and 0G proof are in your activity.' });
       else if (kind === 'refused')
@@ -53,8 +53,8 @@ export function useTraceToasts(): void {
       else if (kind === 'approval')
         toast.warning('Your agent needs your approval', {
           description: e.detail?.slice(0, 140),
-          action: { label: 'Review', onClick: () => void navigate('/inbox') },
+          action: { label: 'Review', onClick: () => void navigate('/autopilot') },
         });
     }
-  }, [events, onCockpit, navigate]);
+  }, [events, inChat, navigate]);
 }

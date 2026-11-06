@@ -11,10 +11,10 @@ export function NotFoundPage() {
         className="py-24"
         icon={<Compass />}
         title="Page not found"
-        description="That page doesn't exist. Head back to your cockpit."
+        description="That page doesn't exist. Head back home."
         action={
           <Button asChild variant="secondary">
-            <Link to="/">Go to cockpit</Link>
+            <Link to="/">Go home</Link>
           </Button>
         }
       />
