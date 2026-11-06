@@ -11,6 +11,8 @@ waits for you.
 > Without 0G the agent can't think, can't double-check its own trades, and there's no tamper-proof
 > record of why it moved your money.
 
+**Live demo:** <https://saka-rust.vercel.app> (sign in as `demo`) · **Demo video:** _link coming soon_
+
 Built for ETHGlobal Mumbai (Nov 5–7, 2026). Execution happens on **one testnet** only. Ethereum
 mainnet is used read-only for market data.
 
@@ -37,22 +39,23 @@ Screenshots use mock data. More are in [`docs/ui-revamp/screenshots/after/`](doc
 
 ## Status
 
-| Area                                                              | State                                          |
-| ----------------------------------------------------------------- | ---------------------------------------------- |
-| Uniswap agent MCP server (16 tools, unsigned-only)                | ✅ done                                        |
-| Privy agent wallet, onboarding, balance watcher, portfolio        | ✅ done                                        |
-| 0G planner, guard (Vela), explainer, request IDs                  | ✅ done                                        |
-| Safety scores, simulation, policy, approvals, execution, 0G log   | ✅ done                                        |
-| Hooks, LP positions, rules (take-profit, stop-loss, DCA, chained) | ✅ done                                        |
-| Autopilot detectors, Telegram alerts, Market Event Simulator      | ✅ done                                        |
-| SAKA interface                                                    | ✅ done                                        |
-| World ID sign-in and step-up approvals                            | 🚧 not yet: a labelled dev identity runs today |
+| Area                                                                       | State                                          |
+| -------------------------------------------------------------------------- | ---------------------------------------------- |
+| Uniswap agent MCP server (16 tools, unsigned-only)                         | ✅ done                                        |
+| Privy agent wallet, onboarding, balance watcher, portfolio                 | ✅ done                                        |
+| 0G planner, guard (Vela), explainer, request IDs                           | ✅ done                                        |
+| Safety scores, simulation, policy, approvals, execution, 0G log            | ✅ done                                        |
+| Hooks, LP positions, rules (take-profit, stop-loss, DCA, chained)          | ✅ done                                        |
+| Autopilot detectors, Telegram alerts, Market Event Simulator               | ✅ done                                        |
+| SAKA interface                                                             | ✅ done                                        |
+| Hosted staging (Azure VM + Vercel), see [`docs/DEPLOY.md`](docs/DEPLOY.md) | ✅ done                                        |
+| World ID sign-in and step-up approvals                                     | 🚧 not yet: a labelled dev identity runs today |
 
 SAKA was first called Warden, so package names (`@warden/*`), the database and older docs still use
 that name.
 
-Build notes: [`PHASE_REPORT_01.md`](PHASE_REPORT_01.md) to [`PHASE_REPORT_08.md`](PHASE_REPORT_08.md),
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and the interface work in
+Build notes: [`PHASE_REPORT_01.md`](PHASE_REPORT_01.md) to [`PHASE_REPORT_09.md`](PHASE_REPORT_09.md),
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), and the interface work in
 [`docs/ui-revamp/`](docs/ui-revamp/final-report.md).
 
 ## Quick start (local)
