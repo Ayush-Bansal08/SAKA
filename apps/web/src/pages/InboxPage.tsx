@@ -11,6 +11,7 @@ import { usd } from '@/features/agent/cards/card-utils';
 import { usePlanAction } from '@/features/agent/plan-hooks';
 import { useSuggestions } from '@/features/inbox/hooks';
 import { BriefCard, SuggestionRow } from '@/features/inbox/SuggestionRow';
+import { DemoButton } from '@/features/simulator/DemoButton';
 import { usePendingApprovals, usePlanDrawer } from '@/features/plan/hooks';
 import { useNow } from '@/hooks/useNow';
 import { cn } from '@/lib/utils';
@@ -91,6 +92,7 @@ export function InboxPage() {
       <PageHeader
         title="Inbox"
         description="Actions waiting for you, and suggestions from your agent."
+        actions={<DemoButton />}
       />
       <div className="grid max-w-4xl grid-cols-[minmax(0,1fr)] gap-5">
         {suggestions.data?.brief && <BriefCard brief={suggestions.data.brief} />}

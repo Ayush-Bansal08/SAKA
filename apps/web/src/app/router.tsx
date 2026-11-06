@@ -7,6 +7,7 @@ import { HooksPage } from '@/pages/HooksPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { SimulatorPage } from '@/pages/SimulatorPage';
 import { AuthGate } from './AuthGate';
 import { RouteError } from './RouteError';
 
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'hooks', element: <HooksPage /> },
       { path: 'hooks/:chainId/:address', element: <HookDetailPage /> },
       { path: 'inbox', element: <InboxPage /> },
+      { path: 'inbox/simulator', element: <SimulatorPage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'approvals/:id', element: <ApprovalPage /> },

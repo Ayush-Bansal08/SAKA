@@ -219,6 +219,9 @@ wait in the inbox and on Telegram with Yes / Change / No, and "Yes" re-quotes be
 - **Telegram:** set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`, then Settings → Connect
   Telegram. `pnpm dev` long-polls; production uses `API_URL/telegram/webhook` with
   `TELEGRAM_WEBHOOK_SECRET`. The bot only sends alerts: free text gets one fixed line.
+- **Market Event Simulator:** set `ENABLE_DEMO_SIMULATOR=true` on the API and open Inbox → Demo.
+  Three scenarios feed simulated market conditions to the 0G planner, which decides; the action
+  then runs the normal pipeline on the testnet (Demo) or stops after simulation (Paper).
 - **Demo:** `POST /admin/simulate-event` with `{ userId, detector, overrides? }` and
   `POST /admin/run-brief` with `{ userId }`, both with the `x-admin-token` header.
 - **Sepolia:** set `UNISWAP_BLOCKED_POOLS` (see `.env.example`) so each trade takes the cleanest
