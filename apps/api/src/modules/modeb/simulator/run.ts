@@ -69,11 +69,12 @@ export const DECISION_PRINCIPLES = [
 /** These replace the prompt's rules for a human conversation, for this run only. */
 const RUN_RULES = [
   'This is an autonomous run: no human is in this conversation and nobody can answer a question. Never set needsClarification.',
-  'Investigate the event in `simulation.event` with the read tools you need, then decide.',
+  'The market facts of the event in `simulation.event` are already in `simulation.market`. Decide from them when they are enough; call a read tool only for a specific fact they lack, in one round at most.',
   'To act, call `propose`. To take no action, call `answer`, with your reasoning as the text.',
   'Choose the size yourself. Unlike a human request, an autonomous action must fit the limits: stay at least 15% under limits.perActionUsd and limits.remainingTodayUsd, because it executes at the live testnet quote, not the scenario price.',
   'Only swaps between allowlisted tokens and LP actions on a listed position are possible here: no transfers, no triggers.',
   'Always pass `digest` with the terminal call: every signal you weighed in signalsChecked (supports ACT, HOLD or NEUTRAL), estimatedCosts, risks, alternativesConsidered, confidence from 0 to 1, and tranche when you act. Report only what you actually assessed.',
+  'Keep the digest short: the 5 signals that weighed most, at most 3 risks and 2 alternatives, a few words each.',
 ];
 
 const RUNNABLE: ReadonlySet<ActionIntent['type']> = new Set([
@@ -323,6 +324,7 @@ async function execute(deps: ModeBDeps, run: RunRecord, scenario: Scenario): Pro
       silent: true,
       traceId: run.id,
       neverAuto: run.mode === 'PAPER',
+      skipExplainer: true,
     });
     if (!processed) throw new Error('That event could not be recorded.');
     run.suggestionId = processed.suggestionId;

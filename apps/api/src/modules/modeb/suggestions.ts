@@ -242,6 +242,8 @@ export interface ProcessOptions {
   neverAuto?: boolean;
   /** Simulator: no "new suggestion" push; the presenter is watching the run. */
   silent?: boolean;
+  /** Simulator: the planner already wrote the reasoning, so the template is enough here. */
+  skipExplainer?: boolean;
 }
 
 export interface ProcessResult {
@@ -356,7 +358,7 @@ export async function processEvent(
   });
 
   // 0GM writes the words; a failure falls back to the same facts as a template.
-  const explainer = deps.zg ? new Explainer(deps.zg, ctx) : null;
+  const explainer = deps.zg && !opts.skipExplainer ? new Explainer(deps.zg, ctx) : null;
   const eventSummary = { kind: event.detector, summary: event.summary, facts: event.facts };
   const explained =
     event.detector === 'MORNING_BRIEF' && opts.brief

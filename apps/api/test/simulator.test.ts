@@ -410,6 +410,12 @@ describe('simulator routes', () => {
       expect(run.suggestion?.actions).not.toContain('yes');
       expect(h.jobs.executions).toHaveLength(0);
       expect((await h.plans())[0]?.status).toBe('CANCELLED');
+      const roles = await h.app.deps.prisma.inference.findMany({
+        where: { agentRequest: { traceId: run.id } },
+        select: { role: true },
+      });
+      expect(roles.map((r) => r.role)).toContain('GUARD');
+      expect(roles.map((r) => r.role)).not.toContain('EXPLAINER');
     } finally {
       await h.app.close();
     }
