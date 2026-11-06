@@ -36,7 +36,7 @@ export function RuleRow({ t }: { t: TriggerView }) {
   const cancel = useCancelTrigger();
   const now = useNow(30_000);
   return (
-    <li className="rounded-lg border border-border bg-surface-2/40 p-3">
+    <li className="rounded-md border border-border bg-surface-2/40 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -54,7 +54,7 @@ export function RuleRow({ t }: { t: TriggerView }) {
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 shrink-0 text-xs"
+            className="shrink-0"
             disabled={cancel.isPending}
             onClick={() => cancel.mutate(t.id)}
             aria-label={`Cancel rule: ${t.summary}`}
@@ -109,8 +109,11 @@ export function RulesPanel({
     : all.filter((t) => t.status === 'ACTIVE' || t.chain?.waitingPlanId);
   const active = all.filter((t) => t.status === 'ACTIVE').length;
   return (
-    <section aria-labelledby="rules-title" className="rounded-lg border border-border bg-card">
-      <header className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+    <section
+      aria-labelledby="rules-title"
+      className="surface-highlight rounded-lg border border-border bg-card"
+    >
+      <header className="flex min-h-14 items-center justify-between gap-2 px-5 py-2.5">
         <button
           type="button"
           onClick={() => collapsible && setOpen((v) => !v)}
@@ -118,7 +121,7 @@ export function RulesPanel({
           className="flex min-w-0 items-center gap-2 rounded text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <ListTodo className="size-4 text-muted-foreground" aria-hidden />
-          <h3 id="rules-title" className="text-sm font-semibold">
+          <h3 id="rules-title" className="text-sm font-medium">
             Rules
           </h3>
           {active > 0 && <Badge tone="agent">{active} active</Badge>}
@@ -135,14 +138,13 @@ export function RulesPanel({
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 text-xs"
           onClick={() => requestPrefill('Sell half if ETH goes up 2%')}
         >
           New rule
         </Button>
       </header>
       {open && (
-        <div className="border-t border-border p-3">
+        <div className="border-t border-border p-4">
           {rules.isPending ? (
             <SkeletonRows rows={2} />
           ) : rules.isError ? (

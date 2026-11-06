@@ -88,7 +88,7 @@ function TelegramSection({ telegram }: { telegram: SettingsResponse['telegram'] 
   if (!telegram.available)
     return (
       <p className="text-sm text-muted-foreground">
-        Telegram is not set up on this server. Alerts stay in your inbox.
+        Telegram is not set up on this server. Alerts stay in Autopilot.
       </p>
     );
 
@@ -142,7 +142,7 @@ function TelegramSection({ telegram }: { telegram: SettingsResponse['telegram'] 
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm">Mute alerts</p>
-          <p className="text-xs text-muted-foreground">Your inbox keeps everything.</p>
+          <p className="text-xs text-muted-foreground">Autopilot keeps everything.</p>
         </div>
         <Switch
           checked={telegram.muted}
@@ -209,7 +209,7 @@ function TimeZoneSection({ timezone }: { timezone: string }) {
         value={timezone}
         disabled={save.isPending}
         onChange={(e) => save.mutate(e.target.value)}
-        className="h-9 w-full rounded-md border border-border-strong bg-surface-2 px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+        className="h-11 w-full rounded-md border border-input bg-surface-2 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 md:h-10"
       >
         {zones.map((z) => (
           <option key={z} value={z}>
@@ -224,7 +224,14 @@ function TimeZoneSection({ timezone }: { timezone: string }) {
   );
 }
 
-export function AlertSettings() {
+type Section = 'telegram' | 'autoAct' | 'timezone';
+
+/** All three sections by default; Settings and Autopilot each show the ones that belong there. */
+export function AlertSettings({
+  sections = ['telegram', 'autoAct', 'timezone'],
+}: {
+  sections?: readonly Section[];
+}) {
   const settings = useSettings();
   if (settings.isPending)
     return (
@@ -247,22 +254,28 @@ export function AlertSettings() {
   const s = settings.data;
   return (
     <>
-      <Panel title="Alerts" subtitle="Where your agent reaches you" icon={<Bell />}>
-        <TelegramSection telegram={s.telegram} />
-      </Panel>
-      <Panel
-        title="Auto-act on suggestions"
-        subtitle="Under your limits and safety checks, your agent may do these without asking"
-        icon={<Zap />}
-      >
-        <AutoActSection autoAct={s.autoAct} />
-        <p className="mt-3 text-xs text-subtle-foreground">
-          Hook pools are never rebalanced or exited on their own, whatever is switched on here.
-        </p>
-      </Panel>
-      <Panel title="Time zone" icon={<Clock3 />}>
-        <TimeZoneSection timezone={s.timezone} />
-      </Panel>
+      {sections.includes('telegram') && (
+        <Panel title="Alerts" subtitle="Where your agent reaches you" icon={<Bell />}>
+          <TelegramSection telegram={s.telegram} />
+        </Panel>
+      )}
+      {sections.includes('autoAct') && (
+        <Panel
+          title="Auto-act on suggestions"
+          subtitle="Under your limits and safety checks, your agent may do these without asking"
+          icon={<Zap />}
+        >
+          <AutoActSection autoAct={s.autoAct} />
+          <p className="mt-3 text-xs text-subtle-foreground">
+            Hook pools are never rebalanced or exited on their own, whatever is switched on here.
+          </p>
+        </Panel>
+      )}
+      {sections.includes('timezone') && (
+        <Panel title="Time zone" icon={<Clock3 />}>
+          <TimeZoneSection timezone={s.timezone} />
+        </Panel>
+      )}
     </>
   );
 }

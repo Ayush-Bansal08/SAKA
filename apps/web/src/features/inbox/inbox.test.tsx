@@ -14,7 +14,7 @@ import { SuggestionCardView } from '@/features/agent/cards/SuggestionCardView';
 import { consumePrefill, subscribePrefill } from '@/features/agent/prefill';
 import { runStatus } from '@/features/trace/trace-utils';
 import { toastKind } from '@/layout/useTraceToasts';
-import { InboxPage } from '@/pages/InboxPage';
+import { DecisionsTab } from '@/pages/autopilot/DecisionsTab';
 import { ISO, renderUi } from '@/test/render';
 import { AlertSettings } from './AlertSettings';
 import { changesSuggestions } from './hooks';
@@ -171,7 +171,7 @@ describe('SuggestionRow', () => {
       },
     });
     await userEvent.click(screen.getByRole('button', { name: 'Change' }));
-    await waitFor(() => expect(ui.location()).toBe('/'));
+    await waitFor(() => expect(ui.location()).toBe('/ask'));
     const sub = subscribePrefill(() => undefined);
     expect(sub.initial).toBe('Swap $20 USDC to ETH');
     sub.unsubscribe();
@@ -245,7 +245,7 @@ describe('Inbox page', () => {
       plan: null,
       actions: [],
     });
-    renderUi(<InboxPage />, {
+    renderUi(<DecisionsTab />, {
       responses: {
         '/suggestions': response({ brief, suggestions: [suggestion()], openCount: 1 }),
         '/approvals/pending': approvals,
@@ -259,7 +259,7 @@ describe('Inbox page', () => {
   });
 
   it('has an empty state', async () => {
-    renderUi(<InboxPage />, {
+    renderUi(<DecisionsTab />, {
       responses: { '/suggestions': response(), '/approvals/pending': approvals },
     });
     expect(await screen.findByText('No suggestions yet')).toBeInTheDocument();

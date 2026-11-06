@@ -37,7 +37,7 @@ export function ReasoningTrace({ runId }: { runId: string | null }) {
           retrying={trace.isFetching}
         />
       ) : (
-        <ol aria-label="Run trace">
+        <ol aria-label="Run trace" aria-live="polite">
           {events.map((event, i) => (
             <EventRow key={event.id} event={event} now={now} last={i === events.length - 1} />
           ))}

@@ -8,6 +8,7 @@ import type * as React from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Badge,
+  Disclosure,
   EmptyState,
   ErrorState,
   Panel,
@@ -26,7 +27,7 @@ const OUTCOME: Record<SimulatorOutcome, { label: string; tone: BadgeTone }> = {
   ADD_LIQUIDITY: { label: 'Added liquidity', tone: 'agent' },
   REMOVE_LIQUIDITY: { label: 'Removed liquidity', tone: 'agent' },
   OTHER_ACTION: { label: 'Other action', tone: 'caution' },
-  NO_ACTION: { label: 'No action', tone: 'safe' },
+  NO_ACTION: { label: 'No action', tone: 'agent' },
   NO_DECISION: { label: 'No decision reached', tone: 'caution' },
 };
 
@@ -43,14 +44,14 @@ const PROPOSED: Partial<Record<SimulatorOutcome, string>> = {
 
 const SUPPORTS: Record<'ACT' | 'HOLD' | 'NEUTRAL', { label: string; tone: BadgeTone }> = {
   ACT: { label: 'Supports acting', tone: 'agent' },
-  HOLD: { label: 'Supports waiting', tone: 'safe' },
+  HOLD: { label: 'Supports waiting', tone: 'neutral' },
   NEUTRAL: { label: 'Neutral', tone: 'neutral' },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
-      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+      <h3 className="micro-label text-subtle-foreground">{title}</h3>
       <div className="mt-1.5 text-[13px] [overflow-wrap:anywhere]">{children}</div>
     </section>
   );
@@ -94,7 +95,7 @@ function Outcome({ run }: { run: SimulatorRunView }) {
       </div>
       {decision.summary && <p className="mt-1.5">{decision.summary}</p>}
       {decision.outcome === 'NO_ACTION' && (
-        <p className="mt-1.5 text-safe">Your agent looked into this and chose not to act.</p>
+        <p className="mt-1.5 text-agent">Your agent looked into this and chose not to act.</p>
       )}
       {tranche && (
         <p className="mt-1 text-xs text-muted-foreground">
@@ -181,15 +182,17 @@ export function DecisionCard({
           <Section title="Why">
             <p>{run.decision.rationale}</p>
             {digest?.signalsChecked && digest.signalsChecked.length > 0 && (
-              <ul className="mt-2 space-y-1.5" aria-label="Signals checked">
-                {digest.signalsChecked.map((s, i) => (
-                  <li key={i} className="flex flex-wrap items-center gap-1.5">
-                    <Badge tone={SUPPORTS[s.supports].tone}>{SUPPORTS[s.supports].label}</Badge>
-                    <span>{s.signal}:</span>
-                    <span className="text-muted-foreground">{s.value}</span>
-                  </li>
-                ))}
-              </ul>
+              <Disclosure title="Signals checked" defaultOpen className="mt-2">
+                <ul className="space-y-1.5" aria-label="Signals checked">
+                  {digest.signalsChecked.map((s, i) => (
+                    <li key={i} className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={SUPPORTS[s.supports].tone}>{SUPPORTS[s.supports].label}</Badge>
+                      <span>{s.signal}:</span>
+                      <span className="text-muted-foreground">{s.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Disclosure>
             )}
           </Section>
           {cost.length > 0 && <Section title="Cost">{cost.join(' · ')}</Section>}
@@ -210,16 +213,18 @@ export function DecisionCard({
             </Section>
           )}
           {digest?.alternativesConsidered && digest.alternativesConsidered.length > 0 && (
-            <Section title="Alternatives considered">
-              <ul className="space-y-1">
-                {digest.alternativesConsidered.map((a, i) => (
-                  <li key={i}>
-                    {a.option}
-                    <span className="text-muted-foreground"> — {a.whyRejected}</span>
-                  </li>
-                ))}
-              </ul>
-            </Section>
+            <section className="border-t border-border pt-3">
+              <Disclosure title="Alternatives considered" technical>
+                <ul className="space-y-1 text-[13px]">
+                  {digest.alternativesConsidered.map((a, i) => (
+                    <li key={i}>
+                      {a.option}
+                      <span className="text-muted-foreground"> — {a.whyRejected}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Disclosure>
+            </section>
           )}
           <Section title="Status">
             {run.status === 'RUNNING' ? (
