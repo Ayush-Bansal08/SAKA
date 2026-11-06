@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { startMockApi, type MockApi } from './mock-api';
 
-const SHOTS = fileURLToPath(new URL('../../../docs/ui-revamp/screenshots/after/', import.meta.url));
+// Set E2E_SHOTS to save elsewhere: sync tools such as OneDrive can lock files in the repo folder.
+const SHOTS =
+  process.env.E2E_SHOTS ??
+  fileURLToPath(new URL('../../../docs/ui-revamp/screenshots/after/', import.meta.url));
 mkdirSync(SHOTS, { recursive: true });
 let api: MockApi;
 
@@ -348,8 +351,13 @@ test('on a phone the plan drawer is a bottom sheet that closes with Escape', asy
   await open(page, '/activity?plan=missing-plan');
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
-  const box = await sheet.boundingBox();
-  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBe(800);
+  // It slides up, so measure where it comes to rest rather than a frame of the animation.
+  await expect
+    .poll(async () => {
+      const box = await sheet.boundingBox();
+      return Math.round((box?.y ?? 0) + (box?.height ?? 0));
+    })
+    .toBe(800);
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
 });
