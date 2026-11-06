@@ -152,9 +152,9 @@ export function LiveActivity({
             aria-pressed={filter === f.id}
             onClick={() => setFilter(f.id)}
             className={cn(
-              'shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+              'min-h-8 shrink-0 rounded-full border px-3 py-0.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
               filter === f.id
-                ? 'border-agent/50 bg-agent/15 text-foreground'
+                ? 'border-border-strong bg-surface-3 text-foreground'
                 : 'border-border text-muted-foreground hover:text-foreground',
             )}
           >
@@ -184,7 +184,7 @@ export function LiveActivity({
             }
           />
         ) : (
-          <ol aria-label="Agent runs" className="divide-y divide-border">
+          <ol aria-label="Agent runs" aria-live="polite" className="divide-y divide-border">
             {visibleRuns.map(({ run, shown }, i) => (
               <RunItem
                 key={run.traceId}
@@ -324,7 +324,7 @@ export const EventRow = memo(function EventRow({
           <time
             dateTime={event.ts}
             title={formatFullTime(event.ts)}
-            className="shrink-0 text-[10.5px] text-subtle-foreground tabular-nums"
+            className="shrink-0 font-mono text-[10.5px] text-subtle-foreground tabular-nums"
           >
             {formatRelative(event.ts, now)}
           </time>
@@ -369,7 +369,7 @@ export const EventRow = memo(function EventRow({
               aria-expanded={open}
               aria-controls={detailsId}
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex items-center gap-1 rounded text-[11px] font-medium text-subtle-foreground transition-colors hover:text-foreground"
+              className="micro-label inline-flex min-h-6 items-center gap-1 rounded-sm text-subtle-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               {open ? 'Hide raw' : 'Raw'}
               {!open && <ExternalLink className="size-3 rotate-90" aria-hidden />}

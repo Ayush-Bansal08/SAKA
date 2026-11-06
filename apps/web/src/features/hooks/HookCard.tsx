@@ -89,23 +89,23 @@ export function HookCard({ hook }: { hook: HookListItem }) {
   const firstPair = hook.pairs[0];
   const ask = () => {
     requestPrefill(`Explain hook ${hook.address}`);
-    void navigate('/');
+    void navigate('/ask');
   };
   const trySwap = () => {
     const sell = firstPair?.token0Symbol ?? 'ETH';
     const buy = firstPair?.token1Symbol ?? 'USDC';
     requestPrefill(`Swap $5 ${sell} to ${buy} through the pool with hook ${hook.address}`);
-    void navigate('/');
+    void navigate('/ask');
   };
   return (
-    <article className="flex h-full flex-col rounded-lg border border-border bg-card p-4 transition-colors hover:border-border-strong">
+    <article className="surface-highlight flex h-full flex-col rounded-lg border border-border bg-card p-5 transition-colors duration-150 hover:border-border-strong">
       <header className="flex items-start gap-3">
         <ScoreRing score={hook.score} band={hook.band} />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-semibold">
+          <h3 className="truncate font-medium">
             <Link
               to={detail}
-              className="rounded hover:text-agent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="rounded hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               {hook.name ?? `${hook.address.slice(0, 6)}…${hook.address.slice(-4)}`}
             </Link>

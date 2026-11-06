@@ -40,9 +40,9 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        'min-h-9 rounded-full border px-3.5 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         active
-          ? 'border-agent/50 bg-agent/15 text-foreground'
+          ? 'border-border-strong bg-surface-3 text-foreground'
           : 'border-border text-muted-foreground hover:text-foreground',
       )}
     >
@@ -91,13 +91,15 @@ export function HooksPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Uniswap v4 hooks, explained"
+        eyebrow="Hooks"
+        title="Uniswap v4 hooks,"
+        accent="explained"
         description="Every hook gets a 0–100 safety score from the Uniswap v4 Security Framework (deterministic) and a plain-English explanation written on 0G."
       />
       <div
         role="tablist"
         aria-label="Hook source"
-        className="mb-4 inline-flex rounded-lg border border-border bg-card p-1"
+        className="mb-4 inline-flex max-w-full flex-wrap rounded-lg border border-border bg-card p-1"
       >
         {(
           [
@@ -112,7 +114,7 @@ export function HooksPage() {
             aria-selected={scope === id}
             onClick={() => setScope(id)}
             className={cn(
-              'rounded-md px-3.5 py-1.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+              'min-h-9 rounded-md px-3.5 py-1.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
               scope === id
                 ? 'bg-surface-3 text-foreground'
                 : 'text-muted-foreground hover:text-foreground',
@@ -146,7 +148,7 @@ export function HooksPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="0x… or USDC"
-            className="h-9 w-full rounded-md border border-input bg-surface-2 pr-3 pl-8 text-sm placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="h-11 w-full rounded-md border border-input bg-surface-2 pr-3 pl-8 text-sm md:h-10 placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           />
         </div>
         <label htmlFor="hook-sort" className="sr-only">
@@ -156,7 +158,7 @@ export function HooksPage() {
           id="hook-sort"
           value={sort}
           onChange={(e) => setSort(e.target.value as HookFilters['sort'])}
-          className="h-9 rounded-md border border-input bg-surface-2 px-2.5 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="h-11 rounded-md border border-input bg-surface-2 px-3 text-sm md:h-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <option value="new">Newest</option>
           <option value="tvl">Highest TVL</option>

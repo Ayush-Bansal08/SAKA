@@ -130,7 +130,7 @@ describe('HookCard', () => {
     expect(got.at(-1)).toBe(
       'Swap $5 ETH to USDC through the pool with hook 0x1111111111111111111111111111111111110080',
     );
-    expect(ui.location()).toBe('/');
+    expect(ui.location()).toBe('/ask');
     await userEvent.click(screen.getByRole('button', { name: /Ask agent about this/ }));
     expect(got.at(-1)).toBe('Explain hook 0x1111111111111111111111111111111111110080');
     sub.unsubscribe();

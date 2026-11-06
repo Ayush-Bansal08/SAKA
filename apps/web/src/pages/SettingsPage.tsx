@@ -1,52 +1,40 @@
-import {
-  CHAINS,
-  RISK_PROFILES,
-  riskProfileSettings,
-  usd,
-  type LimitsView,
-  type UserView,
-} from '@warden/shared';
-import {
-  ArrowUpRight,
-  Fingerprint,
-  Gauge,
-  ShieldCheck,
-  SlidersHorizontal,
-  UserRound,
-  Wallet,
-} from 'lucide-react';
+import { CHAINS, type UserView } from '@warden/shared';
+import { ArrowUpRight, LogOut, ShieldCheck, UserRound, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useOutletContext } from 'react-router';
+import { Link, useOutletContext } from 'react-router';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SimpleTooltip } from '@/components/ui/tooltip';
-import { AddressChip, Badge, EmptyState, ErrorState, HumanBadge, Panel } from '@/components/ui-kit';
-import { useSettings } from '@/features/portfolio/hooks';
-import { PROFILE_COPY } from '@/features/portfolio/profile-copy';
-import { formatFullTime } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import {
+  AddressChip,
+  Badge,
+  Card,
+  EmptyState,
+  ErrorState,
+  HumanBadge,
+  Panel,
+  PillIcon,
+} from '@/components/ui-kit';
+import { useSignOut } from '@/features/auth/hooks';
 import { AlertSettings } from '@/features/inbox/AlertSettings';
-import { RulesPanel } from '@/features/triggers/RulesPanel';
+import { useSettings } from '@/features/portfolio/hooks';
+import { StepUpButton } from '@/features/portfolio/StepUpButton';
+import { formatFullTime } from '@/lib/format';
 import { PageContainer, PageHeader } from './PageHeader';
-
-const STEP_UP_TOOLTIP = 'Needs World ID (coming in Phase 10)';
-
-const HOOK_POLICY_LABEL: Record<LimitsView['hookPolicy'], string> = {
-  SAFE_ONLY: 'Safe hooks only',
-  SAFE_AND_CAUTION: 'Safe + Caution hooks',
-};
 
 export function SettingsPage() {
   const { user } = useOutletContext<{ user: UserView }>();
   const settings = useSettings();
+  const signOut = useSignOut();
 
   return (
     <PageContainer>
       <PageHeader
-        title="Settings"
-        description="Your identity, your agent's wallet and limits, and your alerts."
+        eyebrow="Settings"
+        title="Your account"
+        description="Your identity, your agent's wallet and your alerts."
       />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
         <div className="grid gap-4">
           <Panel title="Account" icon={<UserRound />}>
             <dl className="space-y-3 text-sm">
@@ -115,127 +103,45 @@ export function SettingsPage() {
         </div>
 
         <div className="grid gap-4">
-          <Panel
-            title="Risk profile"
-            subtitle="What your agent may do on its own"
-            icon={<Gauge />}
-            actions={<StepUpButton size="sm">Change profile</StepUpButton>}
-          >
-            <div className="grid gap-3 sm:grid-cols-3">
-              {RISK_PROFILES.map((p) => {
-                const s = riskProfileSettings(p);
-                const active = p === user.riskProfile;
-                return (
-                  <div
-                    key={p}
-                    aria-current={active ? 'true' : undefined}
-                    className={cn(
-                      'rounded-lg border p-3.5',
-                      active ? 'border-agent/50 bg-agent/[0.06]' : 'border-border bg-surface-2/40',
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold">{PROFILE_COPY[p].label}</span>
-                      {active && <Badge tone="agent">Current</Badge>}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{PROFILE_COPY[p].blurb}</p>
-                    <dl className="mt-3 space-y-1.5 text-xs">
-                      <Mini label="Per action">{usd(s.perActionUsd)}</Mini>
-                      <Mini label="Per day">{usd(s.perDayUsd)}</Mini>
-                      <Mini label="Max slippage">{s.maxSlippagePct}%</Mini>
-                      <Mini label="Min safety score">{s.minTradeScoreAuto}</Mini>
-                    </dl>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-subtle-foreground">
-              <Fingerprint className="size-3.5 text-human" aria-hidden />
-              Changing your risk profile or limits always requires a fresh human verification.
+          <AlertSettings sections={['telegram', 'timezone']} />
+          <Card glow="ai" className="p-5">
+            <p className="micro-label text-subtle-foreground">Agent mandate</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your risk profile, limits, auto-act switches and rules live in Autopilot.
             </p>
-          </Panel>
-
-          <Panel
-            title="Limits"
-            subtitle="Applied to every action your agent takes alone"
-            icon={<SlidersHorizontal />}
-            actions={<StepUpButton size="sm">Change limits</StepUpButton>}
-          >
-            {settings.isPending ? (
-              <div role="status" aria-label="Loading limits" className="space-y-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-4 w-full" />
-                ))}
-              </div>
-            ) : settings.data?.limits ? (
-              <LimitsTable limits={settings.data.limits} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Your limits are set when you choose a risk profile during onboarding.
-              </p>
-            )}
-          </Panel>
-
-          <RulesPanel collapsible={false} showClosed />
-          <AlertSettings />
+            <Button size="sm" variant="iconPill" asChild className="mt-4">
+              <Link to="/autopilot/mandate">
+                <PillIcon size="sm" /> Open mandate
+              </Link>
+            </Button>
+          </Card>
         </div>
       </div>
-    </PageContainer>
-  );
-}
 
-function LimitsTable({ limits }: { limits: LimitsView }) {
-  const rows: [string, ReactNode][] = [
-    ['Per action', usd(limits.perActionUsd)],
-    ['Per day', usd(limits.perDayUsd)],
-    ['Max slippage', `${Number(limits.maxSlippagePct)}%`],
-    ['Min trade safety score', `${limits.minTradeScoreAuto} / 100`],
-    ['Hooks without approval', HOOK_POLICY_LABEL[limits.hookPolicy]],
-  ];
-  return (
-    <table className="w-full text-sm">
-      <caption className="sr-only">
-        Agent limits for the {PROFILE_COPY[limits.riskProfile].label} profile
-      </caption>
-      <tbody className="divide-y divide-border">
-        {rows.map(([label, value]) => (
-          <tr key={label}>
-            <th scope="row" className="py-2.5 text-left font-normal text-muted-foreground">
-              {label}
-            </th>
-            <td className="py-2.5 text-right font-medium tabular">{value}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-/** Present but disabled until approvals (P05) and World ID step-up (P10) exist. */
-function StepUpButton({
-  children,
-  icon,
-  size = 'default',
-}: {
-  children: ReactNode;
-  icon?: ReactNode;
-  size?: 'sm' | 'default';
-}) {
-  return (
-    <SimpleTooltip label={STEP_UP_TOOLTIP}>
-      {/* Disabled buttons swallow pointer events; the wrapper keeps the tooltip reachable. */}
-      <span
-        tabIndex={0}
-        className="inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <section
+        aria-labelledby="danger-title"
+        className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/25 p-5"
       >
-        <Button variant="secondary" size={size} disabled>
-          {icon}
-          {children}
-          <Fingerprint className="text-human" aria-hidden />
-          <span className="sr-only">({STEP_UP_TOOLTIP})</span>
+        <div>
+          <h2 id="danger-title" className="micro-label text-danger">
+            Danger zone
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Signing out ends this session. Your agent keeps its wallet, limits and rules.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="border-danger/40 text-danger hover:bg-danger/10"
+          disabled={signOut.isPending}
+          onClick={() =>
+            signOut.mutate(undefined, { onSettled: () => toast.success('Signed out') })
+          }
+        >
+          <LogOut aria-hidden /> Sign out
         </Button>
-      </span>
-    </SimpleTooltip>
+      </section>
+    </PageContainer>
   );
 }
 
@@ -244,15 +150,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex items-center justify-between gap-4">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
       <dd className="min-w-0 truncate text-right font-medium">{children}</dd>
-    </div>
-  );
-}
-
-function Mini({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-subtle-foreground">{label}</dt>
-      <dd className="font-medium tabular">{children}</dd>
     </div>
   );
 }

@@ -19,7 +19,14 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { AddressChip, Badge, ErrorState, HashChip, SkeletonRows } from '@/components/ui-kit';
+import {
+  AddressChip,
+  Badge,
+  Disclosure,
+  ErrorState,
+  HashChip,
+  SkeletonRows,
+} from '@/components/ui-kit';
 import {
   AmountLine,
   ChecksList,
@@ -59,7 +66,7 @@ function Section({
   return (
     <section className="border-b border-border px-5 py-4 last:border-b-0">
       <header className="mb-2.5 flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase [&_svg]:size-3.5">
+        <h3 className="micro-label flex items-center gap-2 text-subtle-foreground [&_svg]:size-3.5">
           {icon}
           {title}
         </h3>
@@ -344,7 +351,9 @@ function PlanBody({ plan }: { plan: PlanView }) {
       <DecisionLogSection plan={plan} />
 
       <Section icon={<FileJson />} title="Raw intent">
-        <Json value={plan.intent} />
+        <Disclosure title="Technical details" technical>
+          <Json value={plan.intent} />
+        </Disclosure>
         <HashChip className="mt-2" label="plan hash" value={plan.planHash} />
       </Section>
     </>

@@ -202,7 +202,7 @@ export function HookDetailPage() {
               variant="outline"
               onClick={() => {
                 requestPrefill(`Explain hook ${h.address}`);
-                void navigate('/');
+                void navigate('/ask');
               }}
             >
               <MessageSquareText aria-hidden /> Ask agent about this
