@@ -102,6 +102,8 @@ export interface PlanOptions {
   digest?: z.ZodTypeAny;
   /** Per-call deadline, for runs that write more than a chat reply. */
   timeoutMs?: number;
+  /** Fail fast instead of sitting out a long Retry-After. */
+  maxRetryWaitMs?: number;
 }
 
 export class PlannerError extends Error {
@@ -345,6 +347,7 @@ export async function plan(
       toolChoice: 'required',
       maxTokens: options.digest ? 3000 : 2000,
       ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.maxRetryWaitMs !== undefined ? { maxRetryWaitMs: options.maxRetryWaitMs } : {}),
     });
     const message = ResponseSchema.parse(response.data).choices[0]!.message;
     const calls = message.tool_calls ?? [];

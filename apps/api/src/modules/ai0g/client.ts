@@ -42,6 +42,8 @@ export interface ChatInput extends CallContext {
   allowFallback?: boolean;
   /** Overrides the role's configured deadline for this call. */
   timeoutMs?: number;
+  /** Gives up rather than honour a longer Retry-After (default 30 s). */
+  maxRetryWaitMs?: number;
   /** Trace kind of the emitted event (defaults: GUARD → guard, otherwise plan). */
   traceKind?: 'plan' | 'guard';
 }
@@ -247,7 +249,12 @@ export class ZgClient {
     },
     path: string,
     body: Record<string, unknown>,
-    options: { timeoutMs: number; stream?: boolean; fallbackOf?: string },
+    options: {
+      timeoutMs: number;
+      stream?: boolean;
+      fallbackOf?: string;
+      maxRetryWaitMs?: number;
+    },
   ): Promise<ZgResult> {
     this.assertNoSecrets(body);
     const label = `${ROLE_LABEL[input.role]}${options.fallbackOf ? ' fallback' : ''}`;
@@ -368,7 +375,7 @@ export class ZgClient {
             : Date.parse(retryAfter) - Date.now()
           : 500 * 2 ** attempt;
         const wait = Number.isFinite(delay) ? Math.max(0, delay) : 500 * 2 ** attempt;
-        if (wait <= 30_000 && Date.now() + wait < deadline) {
+        if (wait <= (options.maxRetryWaitMs ?? 30_000) && Date.now() + wait < deadline) {
           await new Promise((resolve) => setTimeout(resolve, wait));
           continue;
         }
@@ -395,7 +402,11 @@ export class ZgClient {
     const timeoutMs =
       input.timeoutMs ??
       (input.role === 'PLANNER' ? this.env.ZG_PLANNER_TIMEOUT_MS : this.env.ZG_REQUEST_TIMEOUT_MS);
-    const options = { timeoutMs, ...(input.stream ? { stream: true } : {}) };
+    const options = {
+      timeoutMs,
+      ...(input.stream ? { stream: true } : {}),
+      ...(input.maxRetryWaitMs !== undefined ? { maxRetryWaitMs: input.maxRetryWaitMs } : {}),
+    };
     try {
       return await this.call(input, '/chat/completions', body, options);
     } catch (error) {

@@ -43,6 +43,10 @@ const RUN_TTL_S = 7 * 86_400;
 const LOCK_TTL_S = 600;
 /** A decision with its digest outgrows the chat deadline: measured over 12 s on GLM-5.3. */
 const REASONING_TIMEOUT_MS = 60_000;
+/** A presenter is watching: 0G's 30 s Retry-After is a reason to say so, not to sit silent. */
+const MAX_RETRY_WAIT_MS = 2_000;
+export const OVERLOADED =
+  'Reasoning failed: 0G is overloaded right now, so no decision was made and nothing was traded. Try again in about a minute.';
 const MAX_RUNS = 20;
 
 export const simulatorKeys = {
@@ -289,7 +293,11 @@ async function execute(deps: ModeBDeps, run: RunRecord, scenario: Scenario): Pro
       ctx,
       plannerContext,
       [{ role: 'user', content: 'A market event arrived. Investigate it and decide.' }],
-      { digest: DecisionDigestSchema, timeoutMs: REASONING_TIMEOUT_MS },
+      {
+        digest: DecisionDigestSchema,
+        timeoutMs: REASONING_TIMEOUT_MS,
+        maxRetryWaitMs: MAX_RETRY_WAIT_MS,
+      },
     );
     const decision = decisionOf(result);
     run.decision = decision;
@@ -331,8 +339,10 @@ async function execute(deps: ModeBDeps, run: RunRecord, scenario: Scenario): Pro
     if (intent) await settle(deps, run, ctx, processed.suggestionId, intent);
     run.status = 'DONE';
   } catch (err) {
-    const known =
-      err instanceof PlannerError || err instanceof ZgError
+    const overloaded = err instanceof ZgError && (err.status === 429 || err.status === 503);
+    const known = overloaded
+      ? OVERLOADED
+      : err instanceof PlannerError || err instanceof ZgError
         ? `Reasoning failed: ${err.message}`
         : null;
     run.status = 'FAILED';

@@ -246,10 +246,20 @@ async function harness(env: Record<string, string> = { ENABLE_DEMO_SIMULATOR: 't
   const script: Script = { proposals: [], guard: 'approve', decisions: 0, answer: null };
   const router = zgRouter(script);
   let down = false;
+  let overloaded = false;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (...args: Parameters<typeof router>) => {
       if (down) throw new Error('0G down');
+      if (overloaded)
+        return new Response(JSON.stringify({ error: { message: 'model_overloaded' } }), {
+          status: 429,
+          headers: {
+            'content-type': 'application/json',
+            'x-request-id': 'zg-busy',
+            'retry-after': '30',
+          },
+        });
       const body = JSON.parse(String(args[1]?.body ?? '{}')) as { tools?: unknown[] };
       if (script.answer && body.tools?.length)
         return new Response(
@@ -305,6 +315,9 @@ async function harness(env: Record<string, string> = { ENABLE_DEMO_SIMULATOR: 't
     get,
     zgDown: () => {
       down = true;
+    },
+    zgOverloaded: () => {
+      overloaded = true;
     },
     /** Starts a run and waits for it to end. */
     async run(scenarioId: string, mode: string): Promise<SimulatorRunView> {
@@ -507,6 +520,22 @@ describe('simulator routes', () => {
       expect(run.error).toMatch(/^Reasoning failed/);
       expect(run.decision).toBeNull();
       expect(run.suggestion).toBeNull();
+      expect(await h.plans()).toHaveLength(0);
+    } finally {
+      await h.app.close();
+    }
+  });
+
+  it('fails fast and says why when 0G is overloaded, instead of waiting out Retry-After', async () => {
+    const h = await harness();
+    h.zgOverloaded();
+    try {
+      const started = Date.now();
+      const run = await h.run('ETH_DIP_STABILIZING', 'PAPER');
+      expect(Date.now() - started).toBeLessThan(8_000);
+      expect(run.status).toBe('FAILED');
+      expect(run.error).toMatch(/overloaded/);
+      expect(run.decision).toBeNull();
       expect(await h.plans()).toHaveLength(0);
     } finally {
       await h.app.close();
