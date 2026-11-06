@@ -59,8 +59,41 @@ Build notes: [`PHASE_REPORT_01.md`](PHASE_REPORT_01.md) to [`PHASE_REPORT_08.md`
 
 Requirements: Node.js 22 (`.nvmrc`), pnpm 9 (`corepack enable`), Docker.
 
+Create a `.env` file in the repo root:
+
 ```bash
-cp .env.example .env            # then set ENCRYPTION_KEY and ADMIN_TOKEN (see comments)
+# Local services (these match docker-compose.yml)
+WEB_URL=http://localhost:5173
+API_URL=http://localhost:3001
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/warden
+REDIS_URL=redis://localhost:6379
+
+# Dev identity and approvals
+AUTH_MODE=dev
+APPROVAL_MODE=dev
+ALLOW_DEV_PROVIDERS=true
+
+# Generate these (commands below)
+ENCRYPTION_KEY=
+ADMIN_TOKEN=
+MCP_RESUME_SECRET=
+MCP_AUTH_TOKEN=
+
+# Your own keys
+UNISWAP_API_KEY=
+EXECUTION_RPC_URL=
+MAINNET_RPC_URL=
+PRIVY_APP_ID=
+PRIVY_APP_SECRET=
+ZG_API_KEY=
+
+# Optional
+ENABLE_DEMO_SIMULATOR=true
+```
+
+Then start everything:
+
+```bash
 pnpm install
 docker compose up -d            # Postgres 16 (warden + warden_test) and Redis 7
 pnpm db:migrate                 # apply Prisma migrations
@@ -77,7 +110,7 @@ Generate secrets:
 
 ```bash
 openssl rand -base64 32   # ENCRYPTION_KEY
-openssl rand -hex 32      # ADMIN_TOKEN
+openssl rand -hex 32      # ADMIN_TOKEN, MCP_RESUME_SECRET and MCP_AUTH_TOKEN (one each)
 ```
 
 ## Try it
@@ -195,7 +228,7 @@ wait in Autopilot and on Telegram with Yes / Change / No, and "Yes" re-quotes be
   action then runs the normal pipeline on the testnet (Demo) or stops after simulation (Paper).
 - **Demo:** `POST /admin/simulate-event` with `{ userId, detector, overrides? }` and
   `POST /admin/run-brief` with `{ userId }`, both with the `x-admin-token` header.
-- **Sepolia:** set `UNISWAP_BLOCKED_POOLS` (see `.env.example`) so each trade takes the cleanest
+- **Sepolia:** set `UNISWAP_BLOCKED_POOLS` (comma-separated pool addresses) so each trade takes the cleanest
   route.
 - **Price drops buy:** `BIG_MOVE` down and `DIP` buy your dip amount, once a day between them, under
   your limits and the "Dip buys" switch. Autopilot then reports what was bought or sold, and why.
