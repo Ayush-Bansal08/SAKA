@@ -115,6 +115,8 @@ export const EnvSchema = z.object({
   AUTH_MODE: providerMode.default('world'),
   APPROVAL_MODE: providerMode.default('world'),
   ALLOW_DEV_PROVIDERS: booleanString.default('false'),
+  /** Demo market simulator: its button and its routes exist only when this is on. */
+  ENABLE_DEMO_SIMULATOR: booleanString.default('false'),
 
   // --- admin ----------------------------------------------------------------
   ADMIN_TOKEN: z.string().min(24, 'must be at least 24 characters'),

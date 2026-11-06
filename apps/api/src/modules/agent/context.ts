@@ -39,6 +39,8 @@ export interface PlannerContext {
   activeTriggers: { id: string; kind: string; spec: unknown }[];
   tokenAllowlist: { symbol: string; address: string; decimals: number }[];
   pendingIntent?: ActionIntent;
+  /** Simulator runs only: the event to decide on, its market snapshot and the rules of the run. */
+  simulation?: Record<string, unknown>;
 }
 
 const MAX_TOKENS = 12;

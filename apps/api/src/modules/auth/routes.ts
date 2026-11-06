@@ -23,6 +23,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
       identity: env.AUTH_MODE,
       approvals: env.APPROVAL_MODE,
       executionChainId: env.EXECUTION_CHAIN_ID,
+      ...(env.ENABLE_DEMO_SIMULATOR ? { demoSimulator: true } : {}),
     }),
   );
 

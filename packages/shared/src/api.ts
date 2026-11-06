@@ -44,6 +44,8 @@ export const ProvidersResponseSchema = z.object({
   identity: ProviderKindSchema,
   approvals: ProviderKindSchema,
   executionChainId: ExecutionChainIdSchema,
+  /** Present (true) only when ENABLE_DEMO_SIMULATOR is on. */
+  demoSimulator: z.boolean().optional(),
 });
 export type ProvidersResponse = z.infer<typeof ProvidersResponseSchema>;
 
@@ -264,6 +266,8 @@ export const PlanListItemSchema = z.object({
   tradeScore: z.number().int().nullable(),
   tx: z.object({ hash: z.string(), explorerUrl: z.string().url() }).nullable(),
   decisionLog: DecisionLogRefSchema.nullable(),
+  /** Present (true) when a demo event caused this plan. */
+  simulated: z.boolean().optional(),
 });
 export type PlanListItem = z.infer<typeof PlanListItemSchema>;
 

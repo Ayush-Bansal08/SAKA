@@ -10,6 +10,7 @@ export * from './portfolio.js';
 export * from './hooks.js';
 export * from './triggers.js';
 export * from './suggestions.js';
+export * from './simulator.js';
 /**
  * Uniswap agent MCP tool schemas (16 tools + TxStep/SignatureRequest/BuildResult). This module is a
  * byte-for-byte mirror of packages/uniswap-agent-mcp/src/schemas.ts (sync: pnpm --filter

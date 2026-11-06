@@ -94,8 +94,13 @@ export interface PlannerFact {
 }
 
 export type PlanResult =
-  | { kind: 'intent'; intent: ActionIntent; zg: ZgProvenance }
-  | ({ kind: 'answer'; zg: ZgProvenance; facts: PlannerFact[] } & PlannerAnswer);
+  | { kind: 'intent'; intent: ActionIntent; zg: ZgProvenance; digest?: unknown }
+  | ({ kind: 'answer'; zg: ZgProvenance; facts: PlannerFact[]; digest?: unknown } & PlannerAnswer);
+
+export interface PlanOptions {
+  /** Adds a `digest` argument of this shape to `propose` and `answer`; returned unvalidated. */
+  digest?: z.ZodTypeAny;
+}
 
 export class PlannerError extends Error {
   override name = 'PlannerError';
@@ -203,6 +208,24 @@ export const plannerTools: ChatTool[] = [
   ...TERMINAL_TOOLS,
 ];
 
+/** The terminal tools with one more argument. `propose` and `answer` validation ignore it. */
+function withDigest(digest: z.ZodTypeAny): ChatTool[] {
+  return TERMINAL_TOOLS.map((tool) => {
+    if (tool.type !== 'function') return tool;
+    const parameters = tool.function.parameters as { properties: Record<string, unknown> };
+    return {
+      ...tool,
+      function: {
+        ...tool.function,
+        parameters: {
+          ...parameters,
+          properties: { ...parameters.properties, digest: toolSchema(digest) },
+        },
+      },
+    };
+  });
+}
+
 export function systemPrompt(context: PlannerContext): string {
   return `${PROMPT.replaceAll('{{CHAIN_NAME}}', context.chainName).replaceAll(
     '{{CHAIN_ID}}',
@@ -289,7 +312,12 @@ export async function plan(
   ctx: CallContext,
   context: PlannerContext,
   history: { role: 'user' | 'assistant'; content: string }[],
+  options: PlanOptions = {},
 ): Promise<PlanResult> {
+  const terminalTools = options.digest ? withDigest(options.digest) : TERMINAL_TOOLS;
+  const allTools = options.digest
+    ? [...plannerTools.slice(0, READ_TOOLS.length), ...terminalTools]
+    : plannerTools;
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt(context) },
     ...history.slice(-12),
@@ -311,9 +339,9 @@ export async function plan(
       model: client.model('PLANNER'),
       trustMode: 'private',
       messages,
-      tools: terminalOnly ? TERMINAL_TOOLS : plannerTools,
+      tools: terminalOnly ? terminalTools : allTools,
       toolChoice: 'required',
-      maxTokens: 2000,
+      maxTokens: options.digest ? 3000 : 2000,
     });
     const message = ResponseSchema.parse(response.data).choices[0]!.message;
     const calls = message.tool_calls ?? [];
@@ -343,8 +371,9 @@ export async function plan(
         if (calls.length > 1)
           throw new PlannerError('Call propose or answer alone, after any read tools.');
         const args: unknown = JSON.parse(quoteDecimalFields(finalCall.function.arguments));
+        const digest = options.digest ? { digest: (args as { digest?: unknown })?.digest } : {};
         if (finalCall.function.name === 'answer')
-          return { kind: 'answer', ...AnswerSchema.parse(args), zg: response.zg, facts };
+          return { kind: 'answer', ...AnswerSchema.parse(args), zg: response.zg, facts, ...digest };
         const intent = parseIntent(args);
         // Only what the model was given (system/user/tool), never its own output.
         const corpus = JSON.stringify(messages.filter((m) => m.role !== 'assistant')).toLowerCase();
@@ -353,7 +382,7 @@ export async function plan(
           throw new PlannerError(
             `These addresses appear nowhere in the conversation or tools: ${invented.join(', ')}. Use symbols or ask for the full address.`,
           );
-        return { kind: 'intent', intent, zg: response.zg };
+        return { kind: 'intent', intent, zg: response.zg, ...digest };
       } catch (err) {
         problem = err;
       }

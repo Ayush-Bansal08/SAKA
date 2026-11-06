@@ -236,6 +236,12 @@ export interface ProcessOptions {
   /** A morning brief run on demand gets its own row. */
   fresh?: boolean;
   brief?: MorningBriefData;
+  /** Simulator: the run's own trace, so reasoning and execution read as one timeline. */
+  traceId?: string;
+  /** Simulator paper mode: nothing may run alone, so no plan can reach the execution queue. */
+  neverAuto?: boolean;
+  /** Simulator: no "new suggestion" push; the presenter is watching the run. */
+  silent?: boolean;
 }
 
 export interface ProcessResult {
@@ -294,7 +300,7 @@ export async function processEvent(
 ): Promise<ProcessResult | null> {
   const { user, wallet } = owner;
   const now = nowOf(deps);
-  const traceId = randomUUID();
+  const traceId = opts.traceId ?? randomUUID();
   const unique = opts.simulated || opts.fresh;
   const prefill = event.prefill ?? (event.intent ? requestFor(event.intent) : null);
 
@@ -382,7 +388,7 @@ export async function processEvent(
         origin: 'proactive',
         channel: 'WEB',
         portfolioUsd: opts.portfolioUsd,
-        autoAllowed: await autoAllowedFor(deps, user, event),
+        autoAllowed: opts.neverAuto ? false : await autoAllowedFor(deps, user, event),
       });
       planId = result.planId;
       cards = result.cards;
@@ -451,7 +457,7 @@ export async function processEvent(
     },
   });
   await afterReply();
-  await deps.notifications.enqueue({ kind: 'suggestion', suggestionId: row.id });
+  if (!opts.silent) await deps.notifications.enqueue({ kind: 'suggestion', suggestionId: row.id });
   return { suggestionId: row.id, status, planId };
 }
 
@@ -555,6 +561,17 @@ export async function sweepExpiredSuggestions(deps: ModeBDeps): Promise<number> 
   let expired = 0;
   for (const row of due) if (await expire(deps, row)) expired += 1;
   return expired;
+}
+
+/**
+ * Simulator: a prepared plan that must not wait for a yes (paper run, or outside the mandate). It
+ * closes as information, so the inbox offers nothing that could still run it.
+ */
+export async function closeSimulated(deps: ModeBDeps, id: string, note: string): Promise<void> {
+  const row = await deps.prisma.suggestion.findUniqueOrThrow({ where: { id } });
+  if (!(await claim(deps.prisma, id, 'INFO', note))) return;
+  if (row.actionPlanId) await closePlan(deps, row.actionPlanId, 'CANCELLED');
+  await syncCard(deps.prisma, { ...row, status: 'INFO', note });
 }
 
 export async function declineSuggestion(

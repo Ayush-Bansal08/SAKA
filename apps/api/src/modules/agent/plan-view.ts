@@ -126,6 +126,10 @@ export function planListItem(
     amountUsd: new Decimal(plan.amountUsd.toString()).toFixed(2),
     status: plan.status,
     outcome,
+    ...((plan.agentRequest.input as { event?: { simulated?: unknown } } | null)?.event
+      ?.simulated === true
+      ? { simulated: true }
+      : {}),
     policyOutcome: plan.policyOutcome,
     approvedBy:
       outcome === 'EXECUTED' || plan.executions.length
