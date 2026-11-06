@@ -762,8 +762,20 @@ export async function startMockApi(port: number): Promise<MockApi> {
   const openCount = () => suggestions.filter((s) => s.status === 'OPEN').length;
   const settingsView = {
     riskProfile: 'BALANCED',
-    limits: null,
-    wallet: null,
+    limits: {
+      riskProfile: 'BALANCED',
+      perActionUsd: '25.00',
+      perDayUsd: '100.00',
+      maxSlippagePct: '0.5',
+      minTradeScoreAuto: 70,
+      hookPolicy: 'SAFE_ONLY',
+    },
+    wallet: {
+      address: '0xBB02Cfa69c391fb6238DcbEd4Af2BFb1eA40E69E',
+      chainId: 11155111,
+      createdAt: now(),
+      policyId: 'pol_1',
+    },
     timezone: 'Asia/Kolkata',
     telegram: { available: true, linked: false, muted: false, botUsername: 'warden_agent_bot' },
     autoAct: { DIP: true, PROFIT: true, IDLE_USDC: true, BETTER_POOL: false, OUT_OF_RANGE: false },

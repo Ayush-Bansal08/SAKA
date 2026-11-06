@@ -364,3 +364,95 @@ test('the approval link the API sends still works, and Reject trades nothing', a
   await page.getByRole('button', { name: 'Reject' }).click();
   await expect(page.getByText(/Nothing was traded/)).toBeVisible({ timeout: 10_000 });
 });
+
+test('the mandate states the real limits, and locked controls stay locked', async ({ page }) => {
+  await open(page, '/autopilot/mandate');
+  const chips = page.getByRole('list', { name: 'Your mandate' });
+  await expect(chips.getByText('$25.00 per action')).toBeVisible();
+  await expect(chips.getByText('$100.00 per day')).toBeVisible();
+  await expect(chips.getByText('0.5% max slippage')).toBeVisible();
+  await expect(page.getByRole('table').getByText('Safe hooks only')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Change profile/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Change limits/ })).toBeDisabled();
+  await page.screenshot({ path: `${SHOTS}autopilot-mandate.png` });
+});
+
+test('settings shows the agent wallet and keeps Withdraw locked', async ({ page }) => {
+  await open(page, '/settings');
+  await expect(page.getByText('Privy policy enforced')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Withdraw/ })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'Open mandate' })).toHaveAttribute(
+    'href',
+    '/autopilot/mandate',
+  );
+  await page.screenshot({ path: `${SHOTS}settings.png` });
+});
+
+test('the account menu shows the wallet, balance and a way out', async ({ page }) => {
+  await open(page);
+  await page.getByRole('button', { name: /Account menu/ }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu.getByText('Agent wallet')).toBeVisible();
+  await expect(menu.getByText('$231.40')).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
+});
+
+test('an unknown path is the not-found page, inside the shell', async ({ page }) => {
+  await open(page, '/nowhere');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  await page.getByRole('link', { name: 'Go home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test('the API being down shows a clear error with a retry', async ({ page }) => {
+  await page.route('**/auth/providers', (route) => route.abort());
+  await open(page);
+  await expect(page.getByRole('heading', { name: "Can't reach SAKA" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('button', { name: /Try again/ })).toBeVisible();
+});
+
+test('onboarding still walks a new human through funding', async ({ page }) => {
+  const headers = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'authorization,content-type',
+  };
+  const wallet = {
+    address: '0xBB02Cfa69c391fb6238DcbEd4Af2BFb1eA40E69E',
+    chainId: 11155111,
+    createdAt: new Date().toISOString(),
+    policyId: null,
+  };
+  await page.route('**/onboarding', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers })
+      : route.fulfill({
+          headers,
+          json: {
+            step: 'FUND',
+            wallet,
+            profile: 'BALANCED',
+            limits: null,
+            funding: {
+              chainId: 11155111,
+              faucets: [{ label: 'Sepolia faucet', url: 'https://example.com', asset: 'ETH' }],
+              suggestedEth: '0.05',
+              firstDeposit: null,
+            },
+          },
+        }),
+  );
+  await page.route('**/me', async (route) => {
+    if (route.request().method() === 'OPTIONS') return route.continue();
+    const response = await route.fetch();
+    const json = await response.json();
+    json.user.onboardingStep = 'FUND';
+    return route.fulfill({ response, json });
+  });
+  await open(page);
+  await expect(page.getByRole('heading', { name: 'Fund your agent' })).toBeVisible();
+  await expect(page.getByText(/Waiting for your deposit/)).toBeVisible();
+  await expect(page.getByRole('link', { name: /Sepolia faucet/ })).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}onboarding-fund.png` });
+});

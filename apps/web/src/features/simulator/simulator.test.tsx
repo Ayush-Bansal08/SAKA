@@ -2,6 +2,8 @@
 import type { SimulatorRunView } from '@warden/shared';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { SimulatorPage } from '@/pages/SimulatorPage';
+import { renderUi } from '@/test/render';
 import { DecisionCard } from './DecisionCard';
 import { isActive, runEvents } from './hooks';
 
@@ -89,6 +91,31 @@ describe('DecisionCard', () => {
     card({ ...base, effectiveMode: 'PAPER', notice: 'Paper — not broadcast.' });
     expect(screen.getByText('PAPER')).toBeInTheDocument();
     expect(screen.getByText('Paper — not broadcast.')).toBeInTheDocument();
+  });
+});
+
+describe('SimulatorPage', () => {
+  const providers = {
+    appName: 'SAKA',
+    identity: 'dev',
+    approvals: 'dev',
+    executionChainId: 11155111,
+  };
+
+  it('is the ordinary not-found page with the server flag off', async () => {
+    renderUi(<SimulatorPage />, { responses: { '/auth/providers': providers } });
+    expect(await screen.findByText('Page not found')).toBeInTheDocument();
+  });
+
+  it('shows the simulator with the flag on', async () => {
+    renderUi(<SimulatorPage />, {
+      responses: {
+        '/auth/providers': { ...providers, demoSimulator: true },
+        '/simulator/scenarios': { scenarios: [] },
+        '/simulator/runs': { runs: [] },
+      },
+    });
+    expect(await screen.findByText('Market Event Simulator')).toBeInTheDocument();
   });
 });
 

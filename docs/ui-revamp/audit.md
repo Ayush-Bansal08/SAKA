@@ -22,7 +22,7 @@ The spec was written without the code in hand. These gaps change the plan, so th
 | PAPER chip on Activity rows    | Plans carry only `simulated`. Paper exists only on simulator runs                                                   | `LIVE` / `SIMULATED` on Activity; `PAPER` stays in the simulator                         |
 | Light mode                     | Dark only, no toggle                                                                                                | Per the spec: do not add one, no Appearance card                                         |
 | Inbox and Hooks                | Two of today's five nav items. Neither appears in the spec's six views                                              | Mapped in §4.2 and §4.3                                                                  |
-| Advanced options, reset        | Neither exists                                                                                                      | Settings danger zone holds Sign out and Telegram disconnect only                         |
+| Advanced options, reset        | Neither exists                                                                                                      | Settings danger zone holds Sign out. Telegram disconnect stays with Telegram             |
 
 ## 2. Current structure
 
@@ -44,9 +44,10 @@ The spec was written without the code in hand. These gaps change the plan, so th
 
 ## 3. Logic and markup coupling
 
-Rule used: markup moves, logic does not. Nothing in `apps/api`, `packages/*` or `lib/` changes. The
+Rule used: markup moves, logic does not. No logic in `apps/api`, `packages/*` or `lib/` changes. The
 only logic edits are the routing changes in the first table below, all forced by the chat moving
-off `/`.
+off `/`. The D3 rename also edits two strings: the error text in `lib/api.ts` and the `APP_NAME`
+default in `apps/api/src/config/env.ts`.
 
 **Logic touched, needs your sign-off:**
 
