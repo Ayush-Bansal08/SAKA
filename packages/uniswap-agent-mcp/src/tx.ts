@@ -36,6 +36,15 @@ function invalid(message: string, details?: Record<string, unknown>): McpToolErr
   return new McpToolError('INVALID_TX', message, { retryable: false, details });
 }
 
+/** Decimal or 0x-hex unsigned integer → decimal string; null when it is neither. */
+export function weiString(raw: string): string | null {
+  const v = raw.trim();
+  if (/^\d+$/.test(v)) return BigInt(v).toString();
+  if (/^0x[0-9a-fA-F]+$/.test(v)) return BigInt(v).toString();
+  if (v === '0x') return '0';
+  return null;
+}
+
 export function validateTx(
   kind: TxStep['kind'],
   description: string,
@@ -72,9 +81,11 @@ export function validateTx(
   }
   if (tx.maxFeePerGas && tx.gasPrice)
     throw invalid(`${kind}: both maxFeePerGas and gasPrice are set`);
-  const value = tx.value ?? '0';
-  if (!/^\d+$/.test(value)) throw invalid(`${kind}: value must be a wei integer string`);
-  const gasLimit = tx.gasLimit && /^\d+$/.test(tx.gasLimit) ? tx.gasLimit : undefined;
+  // The Trading API returns quantities as 0x-hex (e.g. "0x01954af..."); the LP API as decimal.
+  // Both are normalised to a decimal wei string (the only value format TxRequest allows).
+  const value = weiString(tx.value ?? '0');
+  if (value === null) throw invalid(`${kind}: value must be a wei integer (decimal or 0x hex)`);
+  const gasLimit = tx.gasLimit ? (weiString(tx.gasLimit) ?? undefined) : undefined;
   return {
     kind,
     description,

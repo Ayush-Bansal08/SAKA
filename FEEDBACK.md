@@ -126,3 +126,12 @@ appended to in every phase with concrete friction we hit, with the time and the 
   to exist but has not been deployed. → One hostile or odd transaction took down the official
   data source for every integrator for 5+ days. A null-safe `handleSwap` plus a redeploy fixes it;
   monitoring `hasIndexingErrors` would catch it.
+- **[PHASE 05, 2026-11-06, live] `/swap` returns quantities as 0x-hex** — the `TransactionRequest`
+  from `/swap` carries `value` (and gas fields) as hex strings such as `0x01954af8a2c000`, while
+  the LP API returns decimal strings. Our validator expected decimal wei and rejected every native
+  ETH swap the first time it ran end to end. → We now accept both and normalise to decimal
+  (`packages/uniswap-agent-mcp/src/tx.ts`, `weiString`). Documenting the format in the OpenAPI
+  `TransactionRequest` schema (or using one format across both APIs) would save integrators a bug.
+- **[PHASE 05, 2026-11-06, live] Sepolia price impact** — a $1 ETH → USDC quote on Sepolia reports
+  95.64% price impact (v4 0.3% pool), so the agent's 5% hard limit refuses every swap there. →
+  Correct behaviour for a safety-first agent; the testnet pool needs liquidity before a live demo.

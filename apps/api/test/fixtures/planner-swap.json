@@ -1,0 +1,77 @@
+{
+  "description": "Recorded-shape 0G Router responses for 'Swap $20 ETH to USDC' (GLM-5.3, private): round 1 calls get_quote, round 2 proposes. Field layout (reasoning_content, empty content beside tool_calls, x_0g_trace without tee_verified, two-value X-Request-ID) matches live router responses captured 2026-11-06.",
+  "rounds": [
+    {
+      "headers": { "x-request-id": "333b384f55b2936d, c037f45b-d74f-4594-991a-70a7a6dd251f" },
+      "body": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "model": "glm-5.3",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": null,
+              "tool_calls": [
+                {
+                  "id": "call_quote",
+                  "index": 0,
+                  "type": "function",
+                  "function": {
+                    "name": "get_quote",
+                    "arguments": "{\"tokenIn\": \"ETH\", \"tokenOut\": \"USDC\", \"amount\": \"0.006666\", \"type\": \"EXACT_INPUT\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "usage": { "prompt_tokens": 5210, "completion_tokens": 48, "reasoning_tokens": 2 },
+        "x_0g_trace": {
+          "billing": { "currency": "usd", "total_cost": "40", "total_cost_usd_micro": "40" },
+          "provider": "0xD179F4526064846dE9a9E9D93683AF75CB72E503",
+          "request_id": "c037f45b-d74f-4594-991a-70a7a6dd251f"
+        }
+      }
+    },
+    {
+      "headers": { "x-request-id": "d8d25736e9b9db62, ea06b540-abaa-45b3-823f-938faaa38f18" },
+      "body": {
+        "id": "chatcmpl-2",
+        "object": "chat.completion",
+        "model": "glm-5.3",
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "tool_calls",
+            "message": {
+              "role": "assistant",
+              "content": "",
+              "reasoning_content": null,
+              "tool_calls": [
+                {
+                  "id": "call_propose",
+                  "index": 0,
+                  "type": "function",
+                  "function": {
+                    "name": "propose",
+                    "arguments": "{\"type\": \"swap_exact_in\", \"tokenIn\": {\"symbol\": \"ETH\"}, \"tokenOut\": {\"symbol\": \"USDC\"}, \"amountIn\": \"0.006666\", \"amountUsd\": \"20\", \"reason\": \"Swap $20 of ETH to USDC at the quoted best price.\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "usage": { "prompt_tokens": 5600, "completion_tokens": 70, "reasoning_tokens": 1 },
+        "x_0g_trace": {
+          "billing": { "currency": "usd", "total_cost": "41", "total_cost_usd_micro": "41" },
+          "provider": "0xD179F4526064846dE9a9E9D93683AF75CB72E503",
+          "request_id": "ea06b540-abaa-45b3-823f-938faaa38f18"
+        }
+      }
+    }
+  ]
+}

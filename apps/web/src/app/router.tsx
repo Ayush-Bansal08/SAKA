@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { ActivityPage } from '@/pages/ActivityPage';
+import { ApprovalPage } from '@/pages/ApprovalPage';
 import { CockpitPage } from '@/pages/CockpitPage';
 import { HooksPage } from '@/pages/HooksPage';
 import { InboxPage } from '@/pages/InboxPage';
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
       { path: 'inbox', element: <InboxPage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'approvals/:id', element: <ApprovalPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

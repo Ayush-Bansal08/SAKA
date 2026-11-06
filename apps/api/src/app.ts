@@ -3,6 +3,7 @@
  * tests (fastify.inject / ephemeral listen). It owns and closes its connections.
  */
 import { randomUUID } from 'node:crypto';
+import { agentRoutes } from './modules/agent/routes.js';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import type { PrismaClient } from '@prisma/client';
@@ -32,6 +33,16 @@ import { settingsRoutes } from './modules/users/settings-routes.js';
 import { BalanceReader, PriceService } from './modules/portfolio/market.js';
 import { portfolioRoutes } from './modules/portfolio/routes.js';
 import { createWalletProvider, type WalletProvider } from './modules/wallet/privy.js';
+import { ZgClient } from './modules/ai0g/client.js';
+import { ApprovalsService } from './modules/approvals/service.js';
+import {
+  createApprovalProvider,
+  type DevApprovalProvider,
+} from './modules/approvals/dev-approval-provider.js';
+import { approvalRoutes } from './modules/approvals/routes.js';
+import { planRoutes } from './modules/agent/plan-routes.js';
+import { createChainClient, type ChainClient } from './modules/execution/chain.js';
+import { createBullJobs, type JobQueues } from './modules/execution/jobs.js';
 
 export interface AppDeps {
   env: Env;
@@ -48,6 +59,14 @@ export interface AppDeps {
   prices: PriceService;
   /** Execution-chain balances via MCP get_portfolio (short Redis cache). */
   balances: BalanceReader;
+  /** 0G Router client (null when ZG_API_KEY is not configured: the guard then fails closed). */
+  zg: ZgClient | null;
+  /** Execution-chain RPC reads (null without EXECUTION_RPC_URL: simulation fails closed). */
+  chain: ChainClient | null;
+  /** Producers for the execute / decisionlog queues (the worker consumes them). */
+  jobs: JobQueues;
+  approvals: ApprovalsService;
+  approvalProvider: DevApprovalProvider;
   log: FastifyBaseLogger;
 }
 
@@ -56,6 +75,10 @@ export interface BuildAppOverrides {
   wallets?: WalletProvider | null;
   /** Replace the MCP client (tests). */
   mcp?: UniswapMcpClient | null;
+  /** Replace the job producers (tests). */
+  jobs?: JobQueues;
+  /** Replace the execution-chain client (tests). */
+  chain?: ChainClient | null;
 }
 
 declare module 'fastify' {
@@ -106,6 +129,21 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       : createWalletProvider(env, log.child({ module: 'privy' }));
   const prices = new PriceService(prisma, mcp, log.child({ module: 'prices' }));
   const balances = new BalanceReader(mcp, redis);
+  const zg = env.ZG_API_KEY ? new ZgClient(env, prisma, traceBus) : null;
+  const chain =
+    options.overrides?.chain !== undefined
+      ? options.overrides.chain
+      : createChainClient(env.EXECUTION_CHAIN_ID, env.EXECUTION_RPC_URL);
+  const jobs = options.overrides?.jobs ?? createBullJobs(env.REDIS_URL);
+  const approvals = new ApprovalsService({
+    prisma,
+    trace: traceBus,
+    jobs,
+    ttlSeconds: env.APPROVAL_TTL_SECONDS,
+  });
+  const approvalProvider = createApprovalProvider(env, approvals, (id) =>
+    prisma.approval.findUnique({ where: { id }, select: { expiresAt: true } }),
+  );
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -120,6 +158,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     wallets,
     prices,
     balances,
+    zg,
+    chain,
+    jobs,
+    approvals,
+    approvalProvider,
     log,
   });
   app.decorateRequest('auth', null);
@@ -161,9 +204,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await app.register(onboardingRoutes);
   await app.register(portfolioRoutes);
   await app.register(settingsRoutes);
+  await app.register(agentRoutes);
+  await app.register(planRoutes);
+  await app.register(approvalRoutes);
 
   app.addHook('onClose', async () => {
     await mcp?.close();
+    await jobs.close();
     await traceBus.close();
     await Promise.allSettled([prisma.$disconnect(), redis.quit()]);
   });

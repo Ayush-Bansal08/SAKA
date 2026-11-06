@@ -142,7 +142,9 @@ export type PolicyOutcome = z.infer<typeof PolicyOutcomeSchema>;
 
 export const POLICY_REASON_CODES = [
   // REFUSE
+  'BUILD_FAILED',
   'SIMULATION_REVERTED',
+  'SIMULATION_UNAVAILABLE',
   'UNSUPPORTED_TOKEN',
   'DANGER_HOOK',
   'GUARD_BLOCKED',
@@ -157,6 +159,8 @@ export const POLICY_REASON_CODES = [
   // STEP_UP (limits)
   'OVER_PER_ACTION_LIMIT',
   'OVER_DAILY_LIMIT',
+  /** The USD value could not be priced, so limits cannot be checked: a human decides. */
+  'VALUE_UNKNOWN',
   // STEP_UP (quality)
   'CAUTION_HOOK',
   'TRADE_SCORE_BELOW_AUTO',
@@ -169,6 +173,10 @@ export type PolicyReasonCode = z.infer<typeof PolicyReasonCodeSchema>;
 export const PolicyReasonSchema = z.object({
   code: PolicyReasonCodeSchema,
   message: z.string().min(1),
+  /** The measured value (USD, percent or score) that triggered the rule. */
+  value: z.number().finite().optional(),
+  /** The limit it was compared with. */
+  limit: z.number().finite().optional(),
 });
 export type PolicyReason = z.infer<typeof PolicyReasonSchema>;
 
@@ -183,5 +191,7 @@ export const POLICY_REFUSE = Object.freeze({
 // ---------------------------------------------------------------------------
 
 export const APPROVAL_DEFAULT_TTL_SECONDS = 300;
+/** AUTO actions wait this long (visible countdown + Cancel) before they are queued for execution. */
+export const AUTO_EXECUTE_DELAY_MS = 3_000;
 /** Execution re-quote must be within this percentage of the previewed quote. */
 export const REQUOTE_MAX_DRIFT_PCT = 1;

@@ -7,6 +7,7 @@ import type { Env } from '../config/env.js';
  * signatures or session tokens.
  */
 export const REDACT_PATHS = [
+  'env.ZG_API_KEY',
   'req.headers.authorization',
   'req.headers.cookie',
   'req.headers["x-api-key"]',

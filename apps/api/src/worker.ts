@@ -4,7 +4,21 @@ import { Queue, Worker } from 'bullmq';
 import { EnvError, loadEnv, type Env } from './config/env.js';
 import { runBalanceWatch } from './jobs/balance-watcher.js';
 import { runHeartbeat } from './jobs/heartbeat.js';
-import { HEARTBEAT_EVERY_MS, JOBS, QUEUES } from './jobs/queues.js';
+import { APPROVAL_SWEEP_EVERY_MS, HEARTBEAT_EVERY_MS, JOBS, QUEUES } from './jobs/queues.js';
+import { ApprovalsService } from './modules/approvals/service.js';
+import { createApprovalProvider } from './modules/approvals/dev-approval-provider.js';
+import { createChainClient } from './modules/execution/chain.js';
+import { createBullJobs } from './modules/execution/jobs.js';
+import {
+  abandonPlan,
+  executePlan,
+  LockBusyError,
+  PendingReceiptError,
+  type ExecutorDeps,
+} from './modules/execution/executor.js';
+import { markDecisionLogFailed, uploadDecisionLog } from './modules/decisionlog/service.js';
+import { createDecisionLogStorage } from './modules/decisionlog/storage.js';
+import { createWalletProvider } from './modules/wallet/privy.js';
 import { createPrisma, createRedis } from './lib/infra.js';
 import { createLogger } from './lib/logger.js';
 import { onShutdown } from './lib/shutdown.js';
@@ -41,12 +55,36 @@ await systemQueue.upsertJobScheduler(
   { name: JOBS.heartbeat, opts: { removeOnComplete: 100, removeOnFail: 100 } },
 );
 
+await systemQueue.upsertJobScheduler(
+  JOBS.approvalSweep,
+  { every: APPROVAL_SWEEP_EVERY_MS },
+  { name: JOBS.approvalSweep, opts: { removeOnComplete: 50, removeOnFail: 100 } },
+);
+
+// --- PHASE 05: approvals, execution, decision logs ------------------------------------------
+const jobs = createBullJobs(env.REDIS_URL);
+const approvals = new ApprovalsService({
+  prisma,
+  trace: traceBus,
+  jobs,
+  ttlSeconds: env.APPROVAL_TTL_SECONDS,
+});
+const approvalProvider = createApprovalProvider(env, approvals, (id) =>
+  prisma.approval.findUnique({ where: { id }, select: { expiresAt: true } }),
+);
+const chain = createChainClient(env.EXECUTION_CHAIN_ID, env.EXECUTION_RPC_URL);
+const wallets = createWalletProvider(env, log.child({ module: 'privy' }));
+const storage = createDecisionLogStorage(env);
+const decisionLogDeps = { prisma, storage, traceBus, env };
+
 const systemWorker = new Worker(
   QUEUES.system,
   async (job) => {
     switch (job.name) {
       case JOBS.heartbeat:
         return runHeartbeat({ prisma, redis, log });
+      case JOBS.approvalSweep:
+        return { expired: await approvals.sweepExpired() };
       default:
         throw new Error(`Unknown system job: ${job.name}`);
     }
@@ -97,6 +135,69 @@ if (mcp) {
   log.warn('MCP_AUTH_TOKEN is not set: the balance watcher is disabled (no deposit detection)');
 }
 
+let executeWorker: Worker | null = null;
+if (mcp) {
+  const executorDeps: ExecutorDeps = {
+    env,
+    prisma,
+    redis,
+    mcp,
+    wallets,
+    chain,
+    traceBus,
+    jobs,
+    approvals,
+    approvalProvider,
+  };
+  executeWorker = new Worker(
+    QUEUES.execute,
+    async (job) => {
+      if (job.name !== JOBS.execute) throw new Error(`Unknown execute job: ${job.name}`);
+      return { outcome: await executePlan(executorDeps, String(job.data.planId)) };
+    },
+    // Different users run in parallel; one user's plans are serialised by lock:exec:<userId>.
+    { connection: bullConnection, concurrency: 4, lockDuration: 5 * 60_000 },
+  );
+  executeWorker.on('failed', (job, err) => {
+    if (!job) return;
+    const retryable = err instanceof LockBusyError || err instanceof PendingReceiptError;
+    const exhausted = job.attemptsMade >= (job.opts.attempts ?? 1);
+    if (!retryable || exhausted) {
+      log.error({ err: err.message, planId: job.data.planId }, 'execution job gave up');
+      void abandonPlan(executorDeps, String(job.data.planId), err.message).catch((e: unknown) =>
+        log.error({ err: e }, 'abandonPlan failed'),
+      );
+    }
+  });
+  executeWorker.on('error', (err) => log.error({ err }, 'worker error'));
+} else {
+  log.warn('MCP_AUTH_TOKEN is not set: execution is disabled');
+}
+
+const decisionLogWorker = new Worker(
+  QUEUES.decisionLog,
+  async (job) => {
+    if (job.name !== JOBS.decisionLogUpload)
+      throw new Error(`Unknown decision-log job: ${job.name}`);
+    return { outcome: await uploadDecisionLog(decisionLogDeps, String(job.data.planId)) };
+  },
+  { connection: bullConnection, concurrency: 2 },
+);
+decisionLogWorker.on('failed', (job, err) => {
+  if (!job) return;
+  log.warn(
+    { err: err.message, planId: job.data.planId, attempt: job.attemptsMade },
+    '0G Storage upload failed',
+  );
+  if (job.attemptsMade >= (job.opts.attempts ?? 1))
+    void markDecisionLogFailed(decisionLogDeps, String(job.data.planId), err.message).catch(
+      () => undefined,
+    );
+});
+decisionLogWorker.on('error', (err) => log.error({ err }, 'worker error'));
+if (!storage)
+  log.warn('ZG_STORAGE_PRIVATE_KEY is not set: decision logs stay PENDING (not uploaded)');
+
 // The scheduler runs the first heartbeat immediately, then every HEARTBEAT_EVERY_MS.
 log.info(
   {
@@ -110,6 +211,9 @@ log.info(
 onShutdown(log, async () => {
   await systemWorker.close();
   await walletWorker?.close();
+  await executeWorker?.close();
+  await decisionLogWorker.close();
+  await jobs.close();
   await Promise.allSettled([systemQueue.close(), walletQueue.close()]);
   await mcp?.close();
   await traceBus.close();

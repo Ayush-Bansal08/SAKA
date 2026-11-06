@@ -23,7 +23,10 @@
     "smoke:uniswap": "node --env-file=.env scripts/smoke/uniswap-routes.mjs",
     "smoke:mcp": "pnpm --filter uniswap-agent-mcp exec tsx ../../scripts/smoke/mcp.ts",
     "smoke:privy": "pnpm --filter @warden/api exec tsx --conditions=@warden/source ../../scripts/smoke/privy.ts",
-    "check:sources": "pnpm --filter uniswap-agent-mcp check:sources"
+    "check:sources": "pnpm --filter uniswap-agent-mcp check:sources",
+    "smoke:zg": "pnpm --filter @warden/api exec tsx --conditions=@warden/source ../../scripts/smoke/zg.ts",
+    "smoke:zgstorage": "pnpm --filter @warden/api exec tsx --conditions=@warden/source ../../scripts/smoke/zgstorage.ts",
+    "eval:planner": "pnpm --filter @warden/api exec tsx --conditions=@warden/source eval/planner.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

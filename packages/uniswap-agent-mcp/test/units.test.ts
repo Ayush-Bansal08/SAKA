@@ -265,3 +265,27 @@ describe('http retry + cache', () => {
     expect([a, b, n]).toEqual([1, 1, 1]);
   });
 });
+
+describe('tx value normalisation (Trading API hex quantities)', () => {
+  it('accepts decimal and 0x-hex wei, rejects anything else', async () => {
+    const { weiString, validateTx } = await import('../src/tx.js');
+    expect(weiString('0x01954af8a2c000')).toBe('445624208244736');
+    expect(weiString('1000')).toBe('1000');
+    expect(weiString('0x')).toBe('0');
+    expect(weiString('1e18')).toBeNull();
+    const from = '0x00000000000000000000000000000000000000aa';
+    const step = validateTx(
+      'SWAP',
+      'swap',
+      {
+        to: '0x00000000000000000000000000000000000000bb',
+        from,
+        data: '0x12',
+        value: '0x0de0b6b3a7640000',
+        chainId: 1,
+      },
+      { chainId: 1, from: from as `0x${string}` },
+    );
+    expect(step.tx.value).toBe('1000000000000000000');
+  });
+});

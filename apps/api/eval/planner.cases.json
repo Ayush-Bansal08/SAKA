@@ -1,0 +1,511 @@
+[
+  {
+    "row": "swap",
+    "text": "Swap $20 ETH to USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountUsd": "20"
+      }
+    }
+  },
+  {
+    "row": "swap",
+    "text": "Exchange 0.01 ETH for USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountIn": "0.01"
+      }
+    }
+  },
+  {
+    "row": "swap",
+    "text": "Trade $10 ETH into USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountUsd": "10"
+      }
+    }
+  },
+  {
+    "row": "swap",
+    "text": "Swap 15 USDC to ETH",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "USDC"
+        },
+        "tokenOut": {
+          "symbol": "ETH"
+        },
+        "amountIn": "15"
+      }
+    }
+  },
+  {
+    "row": "exact_out",
+    "text": "Get me exactly 100 USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_out",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountOut": "100"
+      }
+    }
+  },
+  {
+    "row": "exact_out",
+    "text": "Buy exactly 50 USDC with ETH",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_out",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountOut": "50"
+      }
+    }
+  },
+  {
+    "row": "exact_out",
+    "text": "I want exactly 0.005 ETH, pay with USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_out",
+        "tokenIn": {
+          "symbol": "USDC"
+        },
+        "tokenOut": {
+          "symbol": "ETH"
+        },
+        "amountOut": "0.005"
+      }
+    }
+  },
+  {
+    "row": "swap_and_send",
+    "text": "Send 20 USDC to 0x000000000000000000000000000000000000dEaD, pay with ETH",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_and_send",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "mode": "exact_out",
+        "amount": "20",
+        "recipient": "0x000000000000000000000000000000000000dEaD"
+      }
+    }
+  },
+  {
+    "row": "transfer",
+    "text": "Send 20 USDC to 0x000000000000000000000000000000000000dEaD",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "transfer",
+        "token": {
+          "symbol": "USDC"
+        },
+        "amount": "20",
+        "recipient": "0x000000000000000000000000000000000000dEaD"
+      }
+    }
+  },
+  {
+    "row": "withdraw",
+    "text": "Withdraw 0.01 ETH to 0x000000000000000000000000000000000000dEaD",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "transfer",
+        "token": {
+          "symbol": "ETH"
+        },
+        "amount": "0.01",
+        "recipient": "0x000000000000000000000000000000000000dEaD"
+      }
+    }
+  },
+  {
+    "row": "lp",
+    "text": "Put $100 into ETH/USDC",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "lp_open",
+        "amountUsd": "100"
+      }
+    }
+  },
+  {
+    "row": "lp",
+    "text": "Provide $50 of ETH/USDC liquidity",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "lp_open",
+        "amountUsd": "50"
+      }
+    }
+  },
+  {
+    "row": "lp",
+    "text": "Open a wide ETH/USDC position with $20",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "lp_open",
+        "amountUsd": "20",
+        "rangePreset": "wide"
+      }
+    }
+  },
+  {
+    "row": "take_profit",
+    "text": "Sell half if ETH goes up 2%",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "TAKE_PROFIT",
+          "condition": {
+            "type": "change_pct",
+            "changePct": 2
+          },
+          "step": {
+            "type": "sell_percent",
+            "percent": 50
+          }
+        }
+      }
+    }
+  },
+  {
+    "row": "take_profit",
+    "text": "Sell 25% of my ETH if it rises 12%",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "TAKE_PROFIT",
+          "condition": {
+            "type": "change_pct",
+            "changePct": 12
+          },
+          "step": {
+            "type": "sell_percent",
+            "percent": 25
+          }
+        }
+      }
+    }
+  },
+  {
+    "row": "stop_loss",
+    "text": "Stop loss at $2,800",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "STOP_LOSS",
+          "condition": {
+            "type": "price_below",
+            "priceUsd": "2800"
+          }
+        }
+      }
+    }
+  },
+  {
+    "row": "stop_loss",
+    "text": "Sell my ETH if it drops below $2000",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "STOP_LOSS",
+          "condition": {
+            "type": "price_below",
+            "priceUsd": "2000"
+          }
+        }
+      }
+    }
+  },
+  {
+    "row": "dca",
+    "text": "Buy $10 of ETH every day",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "DCA",
+          "buy": {
+            "symbol": "ETH"
+          },
+          "amountUsd": "10",
+          "intervalHours": 24
+        }
+      }
+    }
+  },
+  {
+    "row": "dca",
+    "text": "Buy $20 of ETH every 48 hours",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "DCA",
+          "buy": {
+            "symbol": "ETH"
+          },
+          "amountUsd": "20",
+          "intervalHours": 48
+        }
+      }
+    }
+  },
+  {
+    "row": "chained",
+    "text": "If ETH hits $3,500, sell half, then put the USDC into liquidity",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "create_trigger",
+        "rule": {
+          "kind": "CHAINED",
+          "condition": {
+            "type": "price_above",
+            "priceUsd": "3500"
+          }
+        }
+      }
+    }
+  },
+  {
+    "row": "best_pool",
+    "text": "Best pool for ETH/USDC?",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "token_safety",
+    "text": "Is USDC safe?",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "token_safety",
+    "text": "Is this token safe? 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "hook",
+    "text": "Explain this hook",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "portfolio",
+    "text": "Show my portfolio",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "portfolio",
+    "text": "/risk",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "general",
+    "text": "What can you do?",
+    "expected": {
+      "kind": "answer"
+    }
+  },
+  {
+    "row": "ambiguous",
+    "text": "Swap some tokens",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "ambiguous",
+    "text": "Send 20 USDC to 0xabc",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "ambiguous",
+    "text": "Buy ETH",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "ambiguous",
+    "text": "Put money into a pool",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "ambiguous",
+    "text": "Send it to my friend",
+    "expected": {
+      "kind": "answer",
+      "needsClarification": true
+    }
+  },
+  {
+    "row": "edit",
+    "text": "Make it $30",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "lp_open",
+        "amountUsd": "30",
+        "rangePreset": "balanced"
+      }
+    },
+    "context": {
+      "pendingIntent": {
+        "type": "lp_open",
+        "token0": {
+          "symbol": "ETH"
+        },
+        "token1": {
+          "symbol": "USDC"
+        },
+        "amountUsd": "20",
+        "rangePreset": "balanced",
+        "reason": "Provide liquidity"
+      }
+    }
+  },
+  {
+    "row": "edit",
+    "text": "Make it $30 and add a stop-loss",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountUsd": "30"
+      }
+    },
+    "context": {
+      "pendingIntent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountIn": "0.0066",
+        "amountUsd": "20",
+        "reason": "Swap $20 of ETH to USDC"
+      }
+    }
+  },
+  {
+    "row": "edit",
+    "text": "Actually make it 0.02 ETH",
+    "expected": {
+      "kind": "intent",
+      "intent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountIn": "0.02"
+      }
+    },
+    "context": {
+      "pendingIntent": {
+        "type": "swap_exact_in",
+        "tokenIn": {
+          "symbol": "ETH"
+        },
+        "tokenOut": {
+          "symbol": "USDC"
+        },
+        "amountIn": "0.0066",
+        "amountUsd": "20",
+        "reason": "Swap $20 of ETH to USDC"
+      }
+    }
+  }
+]

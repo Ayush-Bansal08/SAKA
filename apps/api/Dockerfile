@@ -21,6 +21,7 @@ COPY apps/web/package.json apps/web/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --filter @warden/api...
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+COPY scripts/copy-ai-prompts.mjs scripts/copy-ai-prompts.mjs
 RUN pnpm --filter @warden/shared build && pnpm --filter @warden/api build
 # Self-contained production bundle of the api package (+ workspace deps, prod only).
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm --filter @warden/api deploy --prod /out \

@@ -234,3 +234,108 @@ values always come from mainnet reference prices.
 - Web: Vercel (`apps/web/vercel.json`, SPA rewrite, `VITE_API_URL`).
 - Backend: one Docker image (`apps/api/Dockerfile`) for all processes, with Railway services in
   `deploy/railway/` (see its README).
+
+## Phase 04 AI layer
+
+Pipeline steps 1–2 (input → plan) plus the guard (step 6) and explainer used by later phases.
+Nothing in this phase builds, signs or executes a transaction.
+
+**0G client** — `modules/ai0g/client.ts`. One adapter for every inference: the `openai` SDK
+pointed at `ZG_BASE_URL`, headers `X-0G-Provider-Trust-Mode` and `X-Client-Request-Id`, body
+`verify_tee: true` (+ `reasoning_effort` from `ZG_REASONING_EFFORT`). It reads `X-Request-ID`
+(the router may send `edge-id, request-id`; the body `x_0g_trace.request_id` must be one of
+them) and `x_0g_trace` — from the body, or when streaming from the final `choices: []` chunk
+before `[DONE]`. Each HTTP attempt is one `Inference` row (model, trust mode, request IDs,
+provider, `teeVerified`, latency, tokens, cost, ok/error) and one trace event with the 0G chip.
+429/503 retry twice honouring `Retry-After` inside one deadline (`ZG_PLANNER_TIMEOUT_MS` for the
+planner, `ZG_REQUEST_TIMEOUT_MS` for guard/explainer). A failed or timed-out private planner
+call falls back to `ZG_MODEL_PLANNER_FALLBACK` at `ZG_PLANNER_FALLBACK_TRUST_MODE` (`verified`
+by default; keys limited to `private` set `private`), recorded as a separate row with
+`trace.fallbackOf`. A prompt containing any configured key, secret, token or private-key
+material is refused before it is sent.
+
+**Planner** — `modules/agent/planner.ts`, prompt `prompts/planner.v1.md` (loaded at boot),
+context from `modules/agent/context.ts` (risk profile, limits and today's remaining limit,
+compact portfolio, mainnet reference prices, known recipients, active triggers, allowlist,
+pending intent). Tools = the ten MCP read tools + `plan_trigger` + local `propose`/`answer`;
+build tools are never offered or dispatched. Loop: ≤ 5 read rounds (then only the terminal
+functions are offered); each MCP call goes through `mcp.callTool` (tool_call/tool_result
+events) with account defaults filled in (`chainId`, `swapper`). `propose` is Zod-validated and
+every address in it must appear in the context, the user's words or a tool result (no
+invented addresses); one repair round with the error, then a friendly failure.
+
+**Agent entry** — `modules/agent/routes.ts`. `POST /agent/messages` (10/min/user, one plan at a
+time per user) stores the USER message + `AgentRequest`, returns 202 and plans async; the reply
+is an AGENT message with an info card or a provisional `IntentCard` (`Planned: … — preparing…`,
+turned into Preview/Refusal/Approval in P05). `GET /agent/messages?cursor` pages history
+(`AgentMessagesResponseSchema`). The cockpit centre column is the chat (`apps/web/src/features/agent`).
+
+**Guard** — `modules/safety/guard.ts`. Vela via `POST /v1/decisions`: a deterministic text state
+(≤ 1800 chars, lists truncated) and three questions — `verdict` (choice approve/block), `risk`
+(score 0–1), `concerns` (choice over the fixed labels). Block if verdict=block or pApprove < 0.8;
+the reason comes from the explainer (a template when approved with no concern). **Fails
+closed**: any error, timeout or unrecognised answer shape → block with `unavailable: true` and
+"Safety check unavailable — nothing was executed." The vendored OpenAPI types the response as an
+open object, so `parseDecision` accepts the plausible shapes only (`// VERIFY:`).
+
+**Explainer** — `modules/ai0g/explainer.ts`: `explainRefusal`, `explainHook`, `explainSuggestion`,
+`morningBrief`, `explainPoolPick`, `guardReason`, each with its own prompt file, token cap and
+output check, and a deterministic template fallback (it never blocks the UX). The build copies
+prompt files next to the emitted JavaScript (`scripts/copy-ai-prompts.mjs`).
+
+Known operational limit: planning runs in the API process; an abrupt process death can leave
+an unfinished request (and its Redis lock until expiry, 10 min).
+
+## Phase 05 safety, policy, approvals, execution, decision log
+
+Pipeline steps 3–9. Code under `apps/api/src/modules/{agent,safety,policy,approvals,execution,decisionlog}`.
+
+```
+intent ─► preparer ─► hook gate + check_token ─► trade score ─► simulate ─► 0G guard ─► policy
+            │ (MCP build tools, planHash)                                  (fail closed)   │
+            ▼                                                                               ▼
+     ActionPlan.steps = { call, steps, signature?, summary, safety }      AUTO   → QUEUED, 3 s countdown
+                                                                            STEP_UP→ Approval PENDING (5 min)
+                                                                            REFUSE → refusal card + 0G log
+                                                                            ASK    → suggestion (Mode B)
+execute job (worker, lock:exec:<userId>):
+  reserve (approval USED + plan EXECUTING in one tx | AUTO spend re-check)
+  → get_quote (≤ 1% worse, else "Price moved") → rebuild same call → [preSteps → Privy signTypedData
+  → build again with resumeToken+signature] → per tx: eth_call → Privy send (idempotencyKey
+  planId:step) → receipt (timeout → by hash) → post-process → EXECUTED → receipt card → decisionlog.upload
+```
+
+**Preparer** (`agent/preparer.ts`) — deterministic intent → tool mapping; the exact build-tool
+arguments are stored so execution rebuilds fresh calldata (Universal Router deadlines, 120 s
+resume tokens) from the approved facts. `planHash` = sha256(canonical JSON of intent, chain,
+tool, token addresses, raw amounts, recipient, pool, LP position). The rebuilt result must match
+the approved tokens, recipient and exact-side amount, and stay within 1% on the quoted side.
+
+**Safety** — `safety/tradeScore.ts` (PHASE_00 §9 formula, breakdown + REFUSE facts),
+`safety/hookGate.ts` (`score_hook`, `Hook` table cache 1 h; unscorable → Danger),
+`safety/simulate.ts` (viem `eth_call` via `execution/chain.ts`; steps after an approval are
+`deferred`; no RPC → unavailable → refused), `safety/guard.ts` (Phase 04).
+
+**Policy** (`policy/engine.ts`) — a pure function; first match wins (REFUSE → always-STEP_UP →
+limits → quality → ASK → AUTO). A send to any address other than the agent wallet is a
+withdrawal. Unpriceable value → `VALUE_UNKNOWN` step-up.
+
+**Approvals** (`approvals/`) — `ApprovalsService.resolve` is the only exit from PENDING (atomic
+`updateMany where status=PENDING`); APPROVED requires evidence for the account owner (else
+REJECTED) and an unexpired approval (else EXPIRED); it enqueues execution. Expiry sweeper every
+15 s on the system queue. `DevApprovalProvider` exists only when dev providers are allowed; the
+deny route is provider-independent. Cards are patched in place (`agent/card-store.ts`).
+
+**Execution** (`execution/executor.ts`, `jobs.ts`, `chain.ts`) — BullMQ queue `execute`, job id
+`exec-<planId>`, concurrency 4 across users with a Redis lock per user (busy → retry in 2 s).
+Execution rows are written before broadcast; a retried job settles `BROADCAST` rows by hash and
+never sends a step twice. PERMIT_SIGN rows record that the agent wallet signed (never the
+signature). Post-processing: FIFO `TokenLot` consumption + a new SWAP lot (actual ERC-20 amount
+from logs), `LpPosition` from the PositionManager mint log, exits close positions, approved first
+sends add a `KnownRecipient`. Retries exhausted → plan FAILED with a card.
+
+**Decision log** (`decisionlog/`) — canonical JSON (keys sorted; user = sha256(iss+sub); no
+signatures, calldata or personal data) → `DecisionLog` row (payloadHash) → 0G Storage `MemData`
+upload via the turbo indexer (root checked against the local merkle root) → `zgRootHash`,
+`zgTxHash`, trace "Logged to 0G Storage", card patched. Queue `decisionlog`, 5 attempts,
+exponential backoff; without `ZG_STORAGE_PRIVATE_KEY` records stay PENDING.

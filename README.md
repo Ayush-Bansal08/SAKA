@@ -14,15 +14,18 @@ mainnet is used read-only for market data.
 
 ## Status
 
-| Phase | Scope                                                                   | State   |
-| ----- | ----------------------------------------------------------------------- | ------- |
-| 01    | Monorepo, full DB schema, API & web shells, DEV identity, SSE trace bus | ✅ done |
-| 02    | Uniswap agent MCP server (16 tools, unsigned-only) + API client         | ✅ done |
-| 03    | Privy agent wallet, onboarding wizard, balance watcher, portfolio       | ✅ done |
-| 04+   | 0G planner/guard, safety, execution, Mode B, World                      | planned |
+| Phase | Scope                                                                    | State   |
+| ----- | ------------------------------------------------------------------------ | ------- |
+| 01    | Monorepo, full DB schema, API & web shells, DEV identity, SSE trace bus  | ✅ done |
+| 02    | Uniswap agent MCP server (16 tools, unsigned-only) + API client          | ✅ done |
+| 03    | Privy agent wallet, onboarding wizard, balance watcher, portfolio        | ✅ done |
+| 04    | 0G planner, guard (Vela), explainer, request IDs                         | ✅ done |
+| 05    | Prepare, safety scores, simulation, policy, approvals, execution, 0G log | ✅ done |
+| 06+   | Cockpit polish, hooks/LP/triggers, Mode B + Telegram, World ID           | planned |
 
 See [`PHASE_REPORT_01.md`](PHASE_REPORT_01.md), [`PHASE_REPORT_02.md`](PHASE_REPORT_02.md) and
-[`PHASE_REPORT_03.md`](PHASE_REPORT_03.md) for what was built and how it was verified, and
+[`PHASE_REPORT_03.md`](PHASE_REPORT_03.md), [`PHASE_REPORT_04.md`](PHASE_REPORT_04.md) and
+[`PHASE_REPORT_05.md`](PHASE_REPORT_05.md) for what was built and how it was verified, and
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how it fits together.
 
 ## Quick start (local)
@@ -52,21 +55,23 @@ openssl rand -hex 32      # ADMIN_TOKEN
 
 ## Scripts
 
-| Command               | What it does                                                                |
-| --------------------- | --------------------------------------------------------------------------- |
-| `pnpm dev`            | web + api + worker in parallel (Turborepo)                                  |
-| `pnpm lint`           | ESLint (typescript-eslint, react-hooks)                                     |
-| `pnpm typecheck`      | `tsc --noEmit` in every package                                             |
-| `pnpm test`           | Vitest: shared, api (integration with Postgres/Redis), web                  |
-| `pnpm build`          | Build shared, api and web                                                   |
-| `pnpm db:migrate`     | `prisma migrate deploy` with the root `.env`                                |
-| `pnpm db:migrate:dev` | Create a new migration after schema changes                                 |
-| `pnpm db:studio`      | Prisma Studio                                                               |
-| `pnpm db:seed`        | Connectivity check (creates no user data)                                   |
-| `pnpm format`         | Prettier                                                                    |
-| `pnpm smoke:mcp`      | LIVE: MCP quotes (testnet + mainnet), new hooks, hook score                 |
-| `pnpm smoke:privy`    | LIVE: Privy agent wallet + policy, then a 0 ETH self-transfer (prints hash) |
-| `pnpm check:sources`  | LIVE: health of every market-data source + which one serves each capability |
+| Command                | What it does                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `pnpm dev`             | web + api + worker in parallel (Turborepo)                                   |
+| `pnpm lint`            | ESLint (typescript-eslint, react-hooks)                                      |
+| `pnpm typecheck`       | `tsc --noEmit` in every package                                              |
+| `pnpm test`            | Vitest: shared, api (integration with Postgres/Redis), web                   |
+| `pnpm build`           | Build shared, api and web                                                    |
+| `pnpm db:migrate`      | `prisma migrate deploy` with the root `.env`                                 |
+| `pnpm db:migrate:dev`  | Create a new migration after schema changes                                  |
+| `pnpm db:studio`       | Prisma Studio                                                                |
+| `pnpm db:seed`         | Connectivity check (creates no user data)                                    |
+| `pnpm format`          | Prettier                                                                     |
+| `pnpm smoke:mcp`       | LIVE: MCP quotes (testnet + mainnet), new hooks, hook score                  |
+| `pnpm smoke:privy`     | LIVE: Privy agent wallet + policy, then a 0 ETH self-transfer (prints hash)  |
+| `pnpm check:sources`   | LIVE: health of every market-data source + which one serves each capability  |
+| `pnpm smoke:zg`        | LIVE: one call per 0G model (X-Request-ID, trust mode, tee_verified)         |
+| `pnpm smoke:zgstorage` | LIVE: upload a decision log to 0G Storage, download it by root hash, compare |
 
 API tests use the separate `warden_test` database and Redis DB 1. Override them with
 `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
@@ -106,3 +111,68 @@ with `NODE_ENV=production`.
 ## License
 
 [MIT](LICENSE)
+
+## Phase 04 AI layer (0G)
+
+Everything the agent thinks runs on the 0G Router with provenance on every call:
+
+| Role             | Model (env)                    | Trust mode                       | Endpoint                                |
+| ---------------- | ------------------------------ | -------------------------------- | --------------------------------------- |
+| Planner          | `ZG_MODEL_PLANNER` (GLM-5.3)   | `private`                        | `/v1/chat/completions` + MCP read tools |
+| Planner fallback | `ZG_MODEL_PLANNER_FALLBACK`    | `ZG_PLANNER_FALLBACK_TRUST_MODE` | `/v1/chat/completions`                  |
+| Guard            | `ZG_MODEL_GUARD` (Vela 2.0)    | `private`                        | `/v1/decisions` (fails closed)          |
+| Explainer        | `ZG_MODEL_EXPLAINER` (0GM-1.0) | `private`                        | `/v1/chat/completions`                  |
+
+Each call sends `X-0G-Provider-Trust-Mode`, our own `X-Client-Request-Id` and `verify_tee: true`,
+and stores the router's `X-Request-ID` and `x_0g_trace` (provider, `tee_verified`, billing) in an
+`Inference` row. The same request ID appears as a "0G" chip in the live activity panel and on
+the agent's reply. Code: [`apps/api/src/modules/ai0g/client.ts`](apps/api/src/modules/ai0g/client.ts),
+[`agent/planner.ts`](apps/api/src/modules/agent/planner.ts),
+[`safety/guard.ts`](apps/api/src/modules/safety/guard.ts),
+[`ai0g/explainer.ts`](apps/api/src/modules/ai0g/explainer.ts).
+
+Try it: sign in, type **"Swap $20 ETH to USDC"** in the cockpit's Agent panel (or
+`POST /agent/messages { "text": "…" }` with the session token; `GET /agent/messages` for history).
+The live panel shows plan → `get_quote` → result → proposed intent; from Phase 05 the intent
+continues through the safety pipeline below.
+
+- `pnpm smoke:zg` — one live call per model, printing `X-Request-ID`, trust mode and `tee_verified`.
+- `pnpm eval:planner` — 35 live planner cases → [`docs/eval-planner.md`](docs/eval-planner.md)
+  (latest: 32/35, 91.4%).
+- A key restricted to `private` routing must set `ZG_PLANNER_FALLBACK_TRUST_MODE=private`
+  (the router answers `403 trust_mode_mismatch` to `verified` on such keys).
+
+## Phase 05 safety, policy, execution, decision log
+
+Every money-moving intent goes through one deterministic pipeline
+([`agent/pipeline.ts`](apps/api/src/modules/agent/pipeline.ts)):
+
+1. **Prepare** ([`agent/preparer.ts`](apps/api/src/modules/agent/preparer.ts)) — intent → our MCP
+   build tools (`build_swap`, `build_transfer`, `compare_pools` → `build_lp_position`,
+   `build_lp_exit`, `build_rebalance`, `plan_trigger`), USD value at risk from the mainnet
+   reference price, profile slippage, `planHash` = sha256 of canonical JSON.
+2. **Score** — deterministic trade score 0–100 with a `{rule, penalty, evidence}` breakdown
+   ([`safety/tradeScore.ts`](apps/api/src/modules/safety/tradeScore.ts)), `check_token` for every
+   token, `score_hook` for hook pools (cached 1 h, [`safety/hookGate.ts`](apps/api/src/modules/safety/hookGate.ts)).
+3. **Simulate** — `eth_call` of every built step from the agent wallet
+   ([`safety/simulate.ts`](apps/api/src/modules/safety/simulate.ts)); steps after an approval and
+   Permit2-signed steps are simulated again right before broadcast.
+4. **Guard** — 0G Vela 2.0, **fails closed** ("Safety check unavailable").
+5. **Policy** — pure `decide()` → AUTO / STEP_UP / REFUSE / ASK
+   ([`policy/engine.ts`](apps/api/src/modules/policy/engine.ts)), reasons carry value + limit.
+6. **Approve** — AUTO: preview card with a 3-second countdown and Cancel. STEP_UP: approval card
+   bound to user + plan + `planHash` + amount, 5-minute expiry, single use. DEV approval only
+   with dev providers (World ID step-up replaces it in Phase 10). REFUSE: red card with reasons.
+7. **Execute** ([`execution/executor.ts`](apps/api/src/modules/execution/executor.ts)) — BullMQ,
+   one plan at a time per user, approval marked USED in the same transaction, today's spend
+   re-checked, **re-quote within 1%** or "Price moved", fresh calldata, Permit2 signed by Privy
+   only now, Privy broadcast with idempotency key `${planId}:${step}`, receipt (timeout → check
+   by hash, never re-broadcast), lots / LP positions / known recipients updated, receipt card.
+8. **Decision log** ([`decisionlog/`](apps/api/src/modules/decisionlog)) — canonical JSON of the
+   whole decision (0G request IDs, scores, simulation, guard, policy, approval, tx hashes; no
+   personal data, no signatures) uploaded to **0G Storage** with `MemData`; root hash on the card
+   and in `GET /decision-logs/:planId`. Refused, denied, expired and failed plans are logged too.
+
+Routes: `GET /plans/:id`, `POST /plans/:id/cancel`, `POST /plans/:id/repreview`,
+`GET /approvals/:id`, `POST /approvals/:id/deny`, `POST /approvals/:id/dev-approve` (dev only),
+`GET /decision-logs/:planId`. Web: cards in the Agent panel and `/approvals/:id`.

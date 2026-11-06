@@ -62,6 +62,19 @@ const tokenAllowlist = z.string().transform((raw, ctx): AllowlistEntry[] => {
 });
 
 export const EnvSchema = z.object({
+  ZG_BASE_URL: urlWithoutTrailingSlash.default('https://router-api.0g.ai/v1'),
+  ZG_API_KEY: z.string().min(1).optional(),
+  ZG_MODEL_PLANNER: z.string().min(1).optional(),
+  ZG_MODEL_PLANNER_FALLBACK: z.string().min(1).optional(),
+  ZG_MODEL_GUARD: z.string().min(1).optional(),
+  ZG_MODEL_EXPLAINER: z.string().min(1).optional(),
+  ZG_PLANNER_TIMEOUT_MS: z.coerce.number().int().min(100).max(120000).default(12000),
+  /** Per-call budget for guard (/decisions) and explainer calls. */
+  ZG_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(120000).default(20000),
+  /** PHASE_00 §10: the fallback runs `verified`. Keys restricted to `private` must set `private`. */
+  ZG_PLANNER_FALLBACK_TRUST_MODE: z.enum(['private', 'verified']).default('verified'),
+  /** Sent as `reasoning_effort` on chat calls; `off` omits the field. */
+  ZG_REASONING_EFFORT: z.enum(['off', 'low', 'medium', 'high']).default('low'),
   // --- core -----------------------------------------------------------------
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
@@ -128,6 +141,28 @@ export const EnvSchema = z.object({
   BALANCE_POLL_MS: z.coerce.number().int().min(5_000).max(600_000).default(15_000),
   /** Poll interval for users inactive for more than 24 h (ms). */
   BALANCE_POLL_INACTIVE_MS: z.coerce.number().int().min(15_000).max(3_600_000).default(300_000),
+
+  // --- safety, approvals, execution (PHASE 05) --------------------------------
+  /** How long a step-up approval stays valid (PHASE_00 §9: default 5 min). */
+  APPROVAL_TTL_SECONDS: z.coerce.number().int().min(30).max(3_600).default(300),
+  /** Visible countdown before an AUTO action is queued (Cancel works during it). */
+  AUTO_EXECUTE_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(3_000),
+  /** Receipt wait per broadcast transaction before the job re-checks by hash. */
+  RECEIPT_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(600_000).default(90_000),
+
+  // --- 0G Storage decision log (PHASE 05) --------------------------------------
+  /** Funded 0G testnet key that pays for decision-log uploads. Without it, uploads stay PENDING. */
+  ZG_STORAGE_PRIVATE_KEY: z
+    .string()
+    .trim()
+    .regex(/^(0x)?[0-9a-fA-F]{64}$/, 'must be a 32-byte hex private key')
+    .optional(),
+  ZG_STORAGE_RPC: urlWithoutTrailingSlash.default('https://evmrpc-testnet.0g.ai'),
+  ZG_STORAGE_INDEXER: urlWithoutTrailingSlash.default(
+    'https://indexer-storage-testnet-turbo.0g.ai',
+  ),
+  /** 0G chain explorer used for decision-log links (`<base>/tx/<zgTxHash>`). */
+  ZG_STORAGE_EXPLORER_URL: urlWithoutTrailingSlash.default('https://chainscan-galileo.0g.ai'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
