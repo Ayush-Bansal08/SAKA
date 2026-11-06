@@ -292,3 +292,12 @@ rewrites that file.
   the `warden.session` key stay.
 - **D4. Fonts and contrast:** add `@fontsource-variable/geist`, `@fontsource-variable/geist-mono`
   and `@fontsource/instrument-serif` (all OFL-1.1, Hard Rule 7), and use `#858B9F` for `--text-3`.
+
+## 9. Decisions made
+
+Approved by the developer after this audit:
+
+- **D1:** Layout approved as proposed. Inbox becomes Autopilot → Decisions; Hooks stays a sidebar item.
+- **D2:** Option A. Status chip plus the five real switches. No master switch, no new behaviour.
+- **D3:** Full user-facing rename to SAKA, including `APP_NAME`. `@warden/*` and `warden.session` stay.
+- **D4:** Add the three font packages. `--text-3` is `#858B9F`.

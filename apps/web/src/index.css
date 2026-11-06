@@ -1,61 +1,95 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource/instrument-serif/400-italic.css';
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
 /*
- * Warden design system — dark, calm, fintech-trustworthy.
- * One source of truth for colors: semantic CSS variables below, exposed to
- * Tailwind via @theme. Product colors: agent (violet), human (teal), safe,
- * caution, danger, info, zg (0G verification accent).
+ * SAKA design system: dark-first, calm, depth from light rather than shadow.
+ *
+ * Color roles are fixed. Blue (--ai) means the agent. Orange (--warm) means simulated or
+ * needs attention. Green and red are real outcomes only. Neutrals carry everything else,
+ * including the human's own actions (the light pill).
+ *
+ * The first block holds the design tokens. The second maps the semantic names the components
+ * use onto them, and @theme exposes those to Tailwind.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   color-scheme: dark;
-  --radius: 12px;
 
   /* Surfaces */
-  --background: #090c10;
-  --foreground: #e7eaf0;
-  --card: #0f1318;
-  --card-foreground: #e7eaf0;
-  --surface-2: #151a21;
-  --surface-3: #1b212a;
-  --popover: #12171d;
-  --popover-foreground: #e7eaf0;
-  --border: #1e252e;
-  --border-strong: #2a323d;
-  --input: #232a34;
-  --ring: #8b7cf6;
-  --muted: #151a21;
-  --muted-foreground: #8a94a4;
-  --subtle-foreground: #5f6978;
+  --bg-0: #07080c;
+  --bg-1: #0d0f15;
+  --bg-2: #141722;
+  --bg-3: #1c2030;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
 
-  /* shadcn roles */
-  --primary: #8b7cf6;
-  --primary-foreground: #0b0a14;
-  --secondary: #1b212a;
-  --secondary-foreground: #e7eaf0;
-  --accent: #1b212a;
-  --accent-foreground: #e7eaf0;
-  --destructive: #ef5350;
-  --destructive-foreground: #fff5f5;
+  /* Text. --text-3 is lighter than the spec value so muted labels pass WCAG AA on every surface. */
+  --text-1: #f4f5f8;
+  --text-2: #a3a8b8;
+  --text-3: #858b9f;
 
-  /* Product semantics */
-  --agent: #8b7cf6;
-  --human: #2dd4bf;
-  --safe: #34d399;
-  --caution: #fbbf24;
-  --danger: #f87171;
-  --info: #60a5fa;
-  --zg: #f0abfc;
+  /* Roles */
+  --ai: #7b93ff;
+  --ai-soft: rgba(123, 147, 255, 0.14);
+  --ai-deep: #3b4fd8;
+  --warm: #f08a4b;
+  --warm-soft: rgba(240, 138, 75, 0.14);
+  --success: #3dd68c;
+  --danger: #ff5c6c;
+  --warning: #f2b84b;
+
+  /* Depth */
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Semantic names used by the components */
+  --background: var(--bg-0);
+  --foreground: var(--text-1);
+  --card: var(--bg-1);
+  --card-foreground: var(--text-1);
+  --surface-2: var(--bg-2);
+  --surface-3: var(--bg-3);
+  --popover: var(--bg-2);
+  --popover-foreground: var(--text-1);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --input: var(--line-strong);
+  --ring: var(--ai);
+  --muted: var(--bg-2);
+  --muted-foreground: var(--text-2);
+  --subtle-foreground: var(--text-3);
+
+  --primary: var(--text-1);
+  --primary-foreground: var(--bg-0);
+  --secondary: var(--bg-2);
+  --secondary-foreground: var(--text-1);
+  --accent: var(--bg-3);
+  --accent-foreground: var(--text-1);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--bg-0);
+
+  --agent: var(--ai);
+  --human: var(--text-1);
+  --safe: var(--success);
+  --caution: var(--warning);
+  --info: var(--text-2);
+  --zg: var(--ai);
 }
 
 @theme inline {
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-sans:
+    'Geist Variable', 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono:
+    'Geist Mono Variable', 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
+    monospace;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -88,11 +122,12 @@
   --color-danger: var(--danger);
   --color-info: var(--info);
   --color-zg: var(--zg);
+  --color-warm: var(--warm);
 
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 4px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
 }
 
 @layer base {
@@ -108,12 +143,24 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    font-size: 15px;
+    line-height: 24px;
     text-rendering: optimizeLegibility;
   }
 
+  /* Film grain: one fixed layer for the whole app. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   ::selection {
-    background: color-mix(in oklab, var(--agent) 35%, transparent);
+    background: color-mix(in oklab, var(--ai) 35%, transparent);
   }
 
   :focus-visible {
@@ -124,8 +171,70 @@
   /* Quiet, thin scrollbars that match the surfaces */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
+    scrollbar-color: var(--line-strong) transparent;
   }
+}
+
+/* Type scale: desktop → mobile. */
+@utility text-display {
+  font-size: 36px;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+  @variant md {
+    font-size: 56px;
+    line-height: 60px;
+  }
+}
+
+@utility text-h1 {
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.02em;
+  @variant md {
+    font-size: 36px;
+    line-height: 42px;
+  }
+}
+
+@utility text-h2 {
+  font-size: 24px;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+
+@utility text-h3 {
+  font-size: 18px;
+  line-height: 26px;
+  letter-spacing: -0.01em;
+}
+
+/* Mono uppercase label: nav, eyebrows, metadata. */
+@utility micro-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The serif accent: one phrase per view header at most, never numbers or UI. */
+@utility serif-accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* White fading into soft blue, for the key words of a hero headline. */
+@utility text-gradient-ai {
+  background-image: linear-gradient(100deg, var(--text-1) 20%, var(--ai) 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility surface-highlight {
+  box-shadow: var(--inner-highlight);
 }
 
 @layer utilities {
@@ -136,8 +245,132 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Agent "thinking": slow breathing glow. */
+  .agent-breathe {
+    animation: agent-breathe 2.6s ease-in-out infinite;
+  }
+
+  /* View transition: fade and an 8px rise. */
+  .view-enter {
+    animation: view-enter 220ms ease-out both;
+  }
 }
 
+@keyframes agent-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 2px color-mix(in oklab, var(--ai) 45%, transparent));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 9px var(--ai));
+  }
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes shimmer-sweep {
+  from {
+    background-position: 140% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+
+/*
+ * Brand backdrops.
+ * .dot-matrix: an LED field lit by soft diagonal streaks, for splash, connect and share images.
+ * .horizon: the glowing arc. Home only, because it is the signature moment.
+ * .ghost-type: oversized outlined wordmark, at most once per screen.
+ */
+.dot-matrix {
+  position: relative;
+  isolation: isolate;
+  background: var(--bg-0);
+}
+
+.dot-matrix::before,
+.dot-matrix::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.dot-matrix::before {
+  background:
+    radial-gradient(60% 34% at 82% 16%, rgba(214, 222, 255, 0.5), transparent 70%),
+    radial-gradient(52% 30% at 8% 80%, rgba(240, 225, 205, 0.42), transparent 70%),
+    radial-gradient(40% 40% at 94% 62%, rgba(59, 79, 216, 0.34), transparent 70%);
+  filter: blur(26px);
+}
+
+/* A solid sheet with round holes: the light behind shows through as LED dots. */
+.dot-matrix::after {
+  background: var(--bg-0);
+  mask-image: radial-gradient(circle, transparent 1.35px, #000 1.85px);
+  mask-size: 6px 6px;
+}
+
+.horizon {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 460px;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+}
+
+.horizon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  width: max(1500px, 130%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--bg-0) 96%, rgba(59, 79, 216, 0.26) 100%);
+  box-shadow:
+    0 -1px 2px rgba(226, 232, 255, 0.9),
+    0 -3px 30px rgba(123, 147, 255, 0.85),
+    0 -18px 90px rgba(59, 79, 216, 0.75),
+    0 -50px 200px rgba(59, 79, 216, 0.4);
+}
+
+.horizon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    var(--bg-0) 4%,
+    transparent 34%,
+    transparent 66%,
+    var(--bg-0) 96%
+  );
+}
+
+.ghost-type {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--line);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Everything beyond a simple opacity change stops. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -145,5 +378,10 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .agent-breathe {
+    animation: none;
+    opacity: 1;
   }
 }
