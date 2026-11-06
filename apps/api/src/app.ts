@@ -46,6 +46,7 @@ import { triggerRoutes } from './modules/triggers/routes.js';
 import { createChainClient, type ChainClient } from './modules/execution/chain.js';
 import { createBullJobs, type JobQueues } from './modules/execution/jobs.js';
 import { modeBRoutes } from './modules/modeb/routes.js';
+import { simulatorRoutes } from './modules/modeb/simulator/routes.js';
 import { approvalResolved } from './modules/modeb/suggestions.js';
 import { createNotifications, type Notifications } from './modules/telegram/notifications.js';
 import { telegramRoutes } from './modules/telegram/routes.js';
@@ -224,6 +225,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await app.register(hookRoutes);
   await app.register(triggerRoutes);
   await app.register(modeBRoutes);
+  if (env.ENABLE_DEMO_SIMULATOR) await app.register(simulatorRoutes);
   await app.register(telegramRoutes);
 
   app.addHook('onClose', async () => {
