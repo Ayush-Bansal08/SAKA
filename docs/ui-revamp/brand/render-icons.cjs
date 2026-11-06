@@ -24,17 +24,12 @@ const ICONS = [
 
 const OG = `<!doctype html><style>
   * { margin: 0 }
-  body { width: 1200px; height: 630px; background: #07080c; color: #f4f5f8; position: relative;
-    isolation: isolate; display: grid; place-items: center; overflow: hidden }
-  body::before, body::after { content: ''; position: absolute; inset: 0; z-index: -1 }
-  body::before { background:
-    radial-gradient(60% 34% at 82% 16%, rgba(214,222,255,.62), transparent 70%),
-    radial-gradient(52% 30% at 8% 80%, rgba(240,225,205,.5), transparent 70%),
-    radial-gradient(40% 40% at 94% 62%, rgba(59,79,216,.42), transparent 70%);
-    filter: blur(34px) }
-  body::after { background: #07080c;
-    -webkit-mask: radial-gradient(circle, transparent 1.6px, #000 2.2px) 0 0 / 8px 8px }
-  svg { width: 540px; height: auto }
+  body { width: 1200px; height: 630px; color: #f5f3fa; display: grid; place-items: center; overflow: hidden;
+    background:
+      radial-gradient(50% 60% at 18% 12%, rgba(124,58,237,.55), transparent 70%),
+      radial-gradient(46% 56% at 86% 92%, rgba(192,132,252,.34), transparent 70%),
+      #0a0712 }
+  svg { width: 620px; height: auto }
 </style>${wordmark}`;
 
 (async () => {

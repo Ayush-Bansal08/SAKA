@@ -302,3 +302,20 @@ Approved by the developer after this audit:
 - **D2:** Option A. Status chip plus the five real switches. No master switch, no new behaviour.
 - **D3:** Full user-facing rename to SAKA, including `APP_NAME`. `@warden/*` and `warden.session` stay.
 - **D4:** Add the three font packages. `--text-3` is `#858B9F`.
+
+## 10. Design direction change
+
+After reviewing the first build, the developer rejected its layout and logo. These instructions
+replace spec sections 3 to 5, 6.1, 9.1 and 9.2. The Hard Rules still apply, so no feature changed.
+
+| Spec                                      | Now                                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| App at `/`, Home view with horizon hero   | Public landing page at `/` with a Start button; the app is at `/app`  |
+| Separate Home and Ask views               | One workspace: agent in the centre, portfolio cards and a side column |
+| Blue agent colour on near-black           | Purple-black, with violet as both brand and agent colour              |
+| Hairline surfaces, film grain, dot matrix | Glass surfaces on ambient purple light                                |
+| Geist, Instrument Serif, mono labels      | Manrope throughout; mono only for hashes, addresses and raw data      |
+| Rounded lowercase wordmark                | Sharp angular SAKA wordmark and a blade S symbol, straight lines only |
+| Five tabs with Home                       | Agent, Portfolio, Autopilot, Activity, Hooks                          |
+
+The daily limit moved from the top bar to a sidebar card, and stays on Portfolio on tablets and phones.

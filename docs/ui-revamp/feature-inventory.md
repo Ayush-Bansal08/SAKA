@@ -3,7 +3,8 @@
 Every screen, control, data display and flow in `apps/web` as of `07dc051`, with where it lives today
 and where it goes. Paths are relative to `apps/web/src`.
 
-- **New home** uses the views proposed in [audit.md](./audit.md) §4.
+- **New home** uses the views proposed in [audit.md](./audit.md) §4. After the redesign in §10 of
+  that file, read "Home" and "Ask" below as the workspace at `/app`, and `/` as the landing page.
 - **Clicks** is the worst case from any view in the new shell. Target is ≤ 2.
 - **✓** means a unit test, an e2e test or a reviewed screenshot exercised the row in the new UI.
   ☐ means nothing has exercised it since the revamp, so it is unverified, not known broken.

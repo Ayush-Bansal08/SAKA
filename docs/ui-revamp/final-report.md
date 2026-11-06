@@ -4,6 +4,10 @@ Branch `feature/ui-revamp`, not merged or pushed. The whole app is restyled and 
 everything automated passes. It has **not** been run against the live stack: all browser testing
 used the mock API.
 
+> **Updated after the redesign.** The developer rejected the first layout and logo. The app now has
+> a landing page at `/`, a workspace at `/app`, a purple-black glass theme, Manrope, and a sharp new
+> logo. See [audit.md](./audit.md) §10. Sections below reflect the current build.
+
 ## Test results against the baseline
 
 | Check                  | Baseline             | Now                             |
@@ -12,7 +16,7 @@ used the mock API.
 | Lint                   | Pass, no warnings    | Pass, no warnings               |
 | Web unit tests         | 100                  | 108                             |
 | API, MCP, shared tests | 440, 159, 23         | 440, 159, 23                    |
-| Browser tests          | 8                    | 30                              |
+| Browser tests          | 8                    | 33                              |
 | Production build       | Not recorded         | Pass                            |
 | `pnpm format:check`    | 36 existing failures | Not re-run; new files are clean |
 
@@ -21,11 +25,11 @@ component moved: `/` became `/ask` in three places, and `InboxPage` became `Deci
 
 ## What changed
 
-- **Tokens and type:** the spec's palette, Geist, Geist Mono and Instrument Serif, film grain.
-- **Brand:** original wordmark, monogram symbol, favicons, app icons, share image, and the rename.
-- **Shell:** sidebar, remembered icon rail, bottom tabs, account menu with wallet and balance.
-- **Views:** Home, Ask, Autopilot (Decisions, Mandate, Simulator), Portfolio, Activity, Hooks,
-  Settings, sign-in, splash, onboarding and approval.
+- **Tokens and type:** purple-black glass theme, Manrope, larger text, mono only for hashes.
+- **Brand:** sharp wordmark, blade S symbol, favicons, app icons, share image, and the rename.
+- **Shell:** collapsible glass sidebar, quiet top bar, bottom tabs, account menu with wallet and balance.
+- **Views:** cursor-reactive landing page, agent workspace with portfolio, Autopilot (Decisions,
+  Mandate, Simulator), Portfolio, Activity, rebuilt Hooks, Settings, sign-in, onboarding and approval.
 - **Components:** pill buttons, warm chips, cards with corner ticks and glow, disclosures, tab nav,
   bottom sheet, remembered "Show agent internals".
 
@@ -36,8 +40,8 @@ Every change is listed. Nothing else outside the presentation layer moved.
 | File                                        | Change                                          | Why                                          |
 | ------------------------------------------- | ----------------------------------------------- | -------------------------------------------- |
 | `features/agent/prefill.ts`                 | Added a non-consuming observer                  | LP actions and New rule left the chat's side |
-| `HookCard`, `HookDetailPage`, `inbox/hooks` | `navigate('/')` became `navigate('/ask')`       | The chat moved                               |
-| `layout/useTraceToasts.ts`                  | Toasts mute on `/ask`, links go to `/autopilot` | The chat and inbox moved                     |
+| `HookCard`, `HookDetailPage`, `inbox/hooks` | `navigate('/')` became `navigate('/app')`       | The chat moved                               |
+| `layout/useTraceToasts.ts`                  | Toasts mute on `/app`, links go to `/autopilot` | The chat and inbox moved                     |
 | `lib/api.ts`                                | Error text says SAKA                            | Decision D3                                  |
 | `apps/api/src/config/env.ts`                | `APP_NAME` default is SAKA                      | Decision D3                                  |
 

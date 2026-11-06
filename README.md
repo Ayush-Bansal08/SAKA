@@ -14,9 +14,9 @@ waits for you.
 Built for ETHGlobal Mumbai (Nov 5–7, 2026). Execution happens on **one testnet** only. Ethereum
 mainnet is used read-only for market data.
 
-| Home                                               | A trade, before it runs                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------ |
-| ![Home](docs/ui-revamp/screenshots/after/home.png) | ![Preview](docs/ui-revamp/screenshots/after/preview-countdown.png) |
+| Landing                                                  | A trade, before it runs                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| ![Landing](docs/ui-revamp/screenshots/after/landing.png) | ![Preview](docs/ui-revamp/screenshots/after/preview-countdown.png) |
 
 | Market Event Simulator                                                 | Hook safety                                          |
 | ---------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -26,7 +26,7 @@ Screenshots use mock data. More are in [`docs/ui-revamp/screenshots/after/`](doc
 
 ## What it does
 
-- **Ask:** tell the agent what you want. You see the amounts, fees and safety checks, then a
+- **Agent:** tell SAKA what you want, with your portfolio right beside the chat. You see the amounts, fees and safety checks, then a
   3-second countdown with Cancel. Over your limits, it asks first.
 - **Autopilot:** the agent comes to you. Nine detectors watch each funded wallet and propose
   actions with Yes / Change / No, in the app and on Telegram.
@@ -67,10 +67,10 @@ pnpm db:migrate                 # apply Prisma migrations
 pnpm dev                        # web :5173 · api :3001 · worker · Uniswap MCP :3002
 ```
 
-Open <http://localhost:5173>, enter a name (for example `alice`), and choose **Continue (dev
+Open <http://localhost:5173>, choose **Start**, enter a name (for example `alice`), and choose **Continue (dev
 identity)**. Onboarding creates your agent's Privy server wallet (needs `PRIVY_APP_ID` and
 `PRIVY_APP_SECRET`), lets you pick a risk profile, and waits for a testnet ETH deposit. The worker
-detects it within about 15 s (needs the MCP server and `MCP_AUTH_TOKEN`), then opens Home. Live
+detects it within about 15 s (needs the MCP server and `MCP_AUTH_TOKEN`), then opens the workspace. Live
 activity, behind the pulse button in the top bar, shows **"Funded: … ETH"**.
 
 Generate secrets:
@@ -82,9 +82,9 @@ openssl rand -hex 32      # ADMIN_TOKEN
 
 ## Try it
 
-1. **Ask → "Swap $5 ETH to USDC".** Watch the preview, the countdown and the receipt with its 0G proof.
-2. **Ask → "Swap $60 ETH to USDC".** It goes over the limit, so the agent asks you first.
-3. **Ask → "Swap $500 ETH to USDC".** It refuses and explains why.
+1. **Agent → "Swap $5 ETH to USDC".** Watch the preview, the countdown and the receipt with its 0G proof.
+2. **Agent → "Swap $60 ETH to USDC".** It goes over the limit, so the agent asks you first.
+3. **Agent → "Swap $500 ETH to USDC".** It refuses and explains why.
 4. **Autopilot → Simulator** (needs `ENABLE_DEMO_SIMULATOR=true`). Run all three scenarios. The first
    two are both ETH drops with different evidence, so the agent should reach different conclusions.
 5. **Turn on Agent internals** to see the live trace beside the chat.
