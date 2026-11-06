@@ -246,7 +246,21 @@ Tablet: 72px icon rail.   Mobile: top bar + 5 bottom tabs, Hooks and Settings in
 
 ## 6. Baseline
 
-BASELINE_PLACEHOLDER
+Run on `main` at `07dc051`, before any change.
+
+| Check                   | Result                                                         |
+| ----------------------- | -------------------------------------------------------------- |
+| `pnpm typecheck`        | Pass, 4 of 4 packages                                          |
+| `pnpm lint`             | Pass, 4 of 4 packages                                          |
+| `pnpm test`             | Pass, 722 tests: web 100, api 440, mcp 159, shared 23          |
+| `test:e2e` (Playwright) | Pass, 8 of 8, against the mock API                             |
+| `pnpm format:check`     | **Pre-existing failure:** 36 files. CI does not run this check |
+
+There are no pre-existing test, type or lint failures, so every phase is measured against these
+numbers. New files will be Prettier-clean. The 36 existing failures stay as they are unless a phase
+rewrites that file.
+
+"Before" screenshots from this run are in [screenshots/before/](./screenshots/before/).
 
 ## 7. Risks
 
