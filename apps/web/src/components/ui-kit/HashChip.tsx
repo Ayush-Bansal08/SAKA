@@ -28,7 +28,7 @@ export function HashChip({
     <span
       title={value}
       className={cn(
-        'inline-flex max-w-full items-center gap-1 rounded-md border py-0.5 pr-1 pl-1.5 font-mono text-[11px] leading-4',
+        'inline-flex max-w-full items-center gap-1 rounded-sm border py-0.5 pr-1 pl-1.5 font-mono text-[11px] leading-4',
         tone === 'zg'
           ? 'border-zg/20 bg-zg/[0.07] text-zg'
           : 'border-border bg-surface-2 text-foreground/85',

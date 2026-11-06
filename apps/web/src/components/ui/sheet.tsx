@@ -1,4 +1,4 @@
-/** Right-hand side sheet (plan drawer, tablet activity) built on Radix Dialog: focus trap, Esc. */
+/** Drawer on Radix Dialog (focus trap, Esc): right-hand side, or a bottom sheet on phones. */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import type * as React from 'react';
@@ -25,8 +25,9 @@ export function SheetContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex w-full max-w-[640px] flex-col border-l border-border-strong bg-card shadow-2xl shadow-black/50 outline-none',
-          'data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:duration-200',
+          'fixed z-50 flex w-full flex-col border-border-strong bg-card outline-none',
+          'inset-x-0 bottom-0 max-h-[90dvh] rounded-t-xl border-t sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:max-w-[640px] sm:rounded-none sm:border-t-0 sm:border-l',
+          'data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:duration-200 sm:data-[state=open]:slide-in-from-right sm:data-[state=closed]:slide-out-to-right',
           className,
         )}
         {...props}
@@ -47,7 +48,7 @@ export function SheetContent({
           </div>
           <DialogPrimitive.Close
             aria-label="Close"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:size-9"
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

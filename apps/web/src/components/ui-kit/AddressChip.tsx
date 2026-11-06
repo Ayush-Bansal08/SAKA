@@ -19,7 +19,7 @@ export function AddressChip({
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-surface-2 py-0.5 pr-1 pl-2 font-mono text-xs text-foreground/90',
+        'inline-flex max-w-full items-center gap-1 rounded-sm border border-border bg-surface-2 py-0.5 pr-1 pl-2 font-mono text-xs text-foreground/90',
         className,
       )}
       title={address}

@@ -12,52 +12,16 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Badge, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
+import { Badge, ErrorState, Panel, SkeletonRows, Switch } from '@/components/ui-kit';
 import { queryKeys as authKeys } from '@/features/auth/hooks';
 import { useOnTraceEvent, useSettings, walletKeys } from '@/features/portfolio/hooks';
 import { api, ApiError } from '@/lib/api';
-import { cn } from '@/lib/utils';
 import { AUTO_ACT_COPY, timeZones } from './suggestion-meta';
 
 const LINK_POLL_MS = 3_000;
 
 const message = (err: unknown) =>
   err instanceof ApiError ? err.message : 'That did not go through. Please try again.';
-
-function Switch({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (next: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50',
-        checked ? 'border-agent bg-agent' : 'border-border-strong bg-surface-3',
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'absolute top-0.5 left-0.5 size-3.5 rounded-full bg-background transition-transform',
-          checked && 'translate-x-4',
-        )}
-      />
-    </button>
-  );
-}
 
 function useSettingsCache() {
   const qc = useQueryClient();

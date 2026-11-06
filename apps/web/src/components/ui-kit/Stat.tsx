@@ -22,11 +22,11 @@ export function Stat({
 }) {
   return (
     <div className={cn('min-w-0', className)}>
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="micro-label text-subtle-foreground">{label}</div>
       <div
         className={cn(
-          'mt-1 truncate font-semibold tracking-tight tabular',
-          size === 'lg' && 'text-3xl',
+          'mt-2 truncate font-medium tracking-tight tabular',
+          size === 'lg' && 'text-[32px] leading-10',
           size === 'md' && 'text-2xl',
           size === 'sm' && 'text-lg',
         )}

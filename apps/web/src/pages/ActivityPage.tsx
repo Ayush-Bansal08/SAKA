@@ -286,7 +286,7 @@ export function ActivityPage() {
                         >
                           {r.requestText ?? r.summary}
                         </button>
-                        {r.simulated && <Badge tone="caution">Simulated (demo)</Badge>}
+                        {r.simulated && <Badge tone="warm">Simulated (demo)</Badge>}
                       </td>
                       <td className="px-2 py-2.5 text-xs whitespace-nowrap text-muted-foreground">
                         {TYPE_LABEL[r.type] ?? r.type}
@@ -349,7 +349,7 @@ export function ActivityPage() {
                       <span className="min-w-0 truncate text-sm font-medium">
                         {r.requestText ?? r.summary}
                         {r.simulated && (
-                          <Badge tone="caution" className="ml-1.5">
+                          <Badge tone="warm" className="ml-1.5">
                             Simulated (demo)
                           </Badge>
                         )}

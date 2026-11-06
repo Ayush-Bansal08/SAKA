@@ -16,6 +16,8 @@ const badgeVariants = cva(
         agent: 'border-agent/25 bg-agent/10 text-agent',
         human: 'border-human/25 bg-human/10 text-human',
         zg: 'border-zg/25 bg-zg/10 text-zg',
+        warm: 'border-warm/30 bg-warm/15 text-warm',
+        warmOutline: 'border-warm/50 bg-transparent text-warm',
       },
     },
     defaultVariants: { tone: 'neutral' },

@@ -24,11 +24,13 @@ export function EmptyState({
       className={cn('flex flex-col items-center justify-center px-6 py-10 text-center', className)}
     >
       {icon && (
-        <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-border bg-surface-2 text-muted-foreground [&_svg]:size-5">
+        <div className="relative mb-5 flex size-16 items-center justify-center text-muted-foreground [&_svg]:size-6 [&_svg]:stroke-[1.25]">
+          <span aria-hidden className="absolute inset-0 rounded-full border border-border" />
+          <span aria-hidden className="absolute inset-2.5 rounded-full border border-border" />
           {icon}
         </div>
       )}
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="text-sm font-medium">{title}</h3>
       {description && (
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
           {description}
@@ -58,10 +60,10 @@ export function ErrorState({
       role="alert"
       className={cn('flex flex-col items-center px-6 py-10 text-center', className)}
     >
-      <div className="mb-4 flex size-12 items-center justify-center rounded-xl border border-danger/25 bg-danger/10 text-danger">
+      <div className="mb-4 flex size-12 items-center justify-center rounded-full border border-danger/25 bg-danger/10 text-danger">
         <AlertTriangle className="size-5" aria-hidden />
       </div>
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="text-sm font-medium">{title}</h3>
       {description && (
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
           {description}
@@ -125,10 +127,10 @@ export function Banner({
     <div
       role={tone === 'warn' ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm',
+        'flex items-start gap-2.5 rounded-md border px-3.5 py-2.5 text-sm',
         tone === 'warn'
           ? 'border-caution/30 bg-caution/10 text-caution'
-          : 'border-info/25 bg-info/10 text-info',
+          : 'border-border bg-surface-2 text-muted-foreground',
         className,
       )}
     >

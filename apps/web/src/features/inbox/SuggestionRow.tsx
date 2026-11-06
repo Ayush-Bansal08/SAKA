@@ -66,7 +66,7 @@ export function SuggestionRow({ s }: { s: SuggestionView }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="font-medium [overflow-wrap:anywhere]">{s.title}</p>
           {s.severity === 'RED' && <Badge tone="danger">Red alert</Badge>}
-          {s.simulated && <Badge tone="caution">Simulated (demo)</Badge>}
+          {s.simulated && <Badge tone="warm">Simulated (demo)</Badge>}
         </div>
         <p className="mt-0.5 text-[13px] text-muted-foreground [overflow-wrap:anywhere]">
           {s.message}
@@ -159,7 +159,7 @@ export function BriefCard({ brief }: { brief: SuggestionView }) {
       icon={<Sunrise />}
       actions={
         <span className="flex items-center gap-1.5">
-          {brief.simulated && <Badge tone="caution">Simulated (demo)</Badge>}
+          {brief.simulated && <Badge tone="warm">Simulated (demo)</Badge>}
           {brief.zg && <ZgVerifiedBadge title={`0G request ${brief.zg.requestId}`} />}
         </span>
       }
