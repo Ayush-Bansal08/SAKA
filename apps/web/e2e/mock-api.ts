@@ -25,6 +25,10 @@ import {
   PlanViewSchema,
   PortfolioResponseSchema,
   ProvidersResponseSchema,
+  SimulatorRunViewSchema,
+  SimulatorRunsResponseSchema,
+  SimulatorScenariosResponseSchema,
+  type SimulatorRunView,
   SettingsResponseSchema,
   SuggestionActionResponseSchema,
   SuggestionsResponseSchema,
@@ -62,7 +66,26 @@ export interface MockApi {
   close(): Promise<void>;
 }
 
+const SCENARIOS = [
+  {
+    id: 'ETH_DIP_STABILIZING',
+    label: 'ETH down 10%, stabilizing',
+    description: 'ETH fell 10% in a day and has held for three hours.',
+  },
+  {
+    id: 'ETH_CRASH_GUARD',
+    label: 'ETH down 8% in an hour',
+    description: 'ETH fell 8% in an hour and volume is climbing.',
+  },
+  {
+    id: 'LP_MIGRATION_NOT_WORTH_IT',
+    label: 'A better LP pool?',
+    description: 'A new pool shows a higher headline fee APR than your position.',
+  },
+] as const;
+
 export async function startMockApi(port: number): Promise<MockApi> {
+  const simulatorRuns: SimulatorRunView[] = [];
   const now = () => new Date().toISOString();
   const user = {
     id: 'user_demo',
@@ -582,7 +605,32 @@ export async function startMockApi(port: number): Promise<MockApi> {
           pnl: null,
         },
       ],
-      lpPositions: [],
+      lpPositions: [
+        {
+          id: 'lp_1',
+          chainId: 11155111,
+          tokenId: '42',
+          poolId: `0x${'bb'.repeat(32)}`,
+          token0: { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000' },
+          token1: { symbol: 'USDC', address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' },
+          amount0: '0.002',
+          amount1: '5.1',
+          fees0: '0',
+          fees1: '0.03',
+          tickLower: -200000,
+          tickUpper: -190000,
+          currentTick: -195000,
+          priceLower: '2200',
+          priceUpper: '2800',
+          priceCurrent: '2500',
+          inRange: true,
+          valueUsd: '10.12',
+          costBasisUsd: '10',
+          pnlUsd: '0.12',
+          hook: null,
+          openedAt: now(),
+        },
+      ],
       pnl: { totalUsd: '3.12', pct: '1.37', costBasisUsd: '228.28', perToken: [] },
       risk: {
         score: 38,
@@ -735,8 +783,47 @@ export async function startMockApi(port: number): Promise<MockApi> {
             identity: 'dev',
             approvals: 'dev',
             executionChainId: 11155111,
+            demoSimulator: true,
           }),
         );
+      if (p === '/simulator/scenarios')
+        return send(res, 200, SimulatorScenariosResponseSchema.parse({ scenarios: SCENARIOS }));
+      if (p === '/simulator/runs' && req.method === 'GET')
+        return send(res, 200, SimulatorRunsResponseSchema.parse({ runs: simulatorRuns }));
+      if (p === '/simulator/runs' && req.method === 'POST') {
+        const input = (await body(req)) as {
+          scenarioId: (typeof SCENARIOS)[number]['id'];
+          mode: 'DEMO' | 'PAPER';
+        };
+        const scenario = SCENARIOS.find((s) => s.id === input.scenarioId)!;
+        const run = SimulatorRunViewSchema.parse({
+          id: randomUUID(),
+          scenarioId: scenario.id,
+          label: scenario.label,
+          mode: input.mode,
+          effectiveMode: input.mode,
+          status: 'DONE',
+          event: scenario.description,
+          decision: {
+            outcome: 'NO_ACTION',
+            summary: null,
+            rationale: 'The break-even is far too long to justify moving.',
+            digest: {
+              signalsChecked: [{ signal: 'Break-even', value: '29 weeks', supports: 'HOLD' }],
+              alternativesConsidered: [{ option: 'Move now', whyRejected: 'Gas eats the gain' }],
+            },
+            zg: { requestId: 'r', clientRequestId: 'c', model: 'm', trustMode: 'private' },
+          },
+          rejected: false,
+          notice: null,
+          error: null,
+          suggestion: null,
+          createdAt: now(),
+        });
+        simulatorRuns.unshift(run);
+        emit(run.id, { kind: 'plan', title: 'Investigating the event' });
+        return send(res, 200, run);
+      }
       if (p === '/me') return send(res, 200, MeResponseSchema.parse({ user }));
       if (p === '/portfolio') return send(res, 200, portfolio());
       if (p === '/settings') return send(res, 200, SettingsResponseSchema.parse(settingsView));
@@ -789,6 +876,27 @@ export async function startMockApi(port: number): Promise<MockApi> {
             devApproveAvailable: true,
           }),
         );
+      const approvalPage = /^\/approvals\/([^/]+)$/.exec(p);
+      if (approvalPage && req.method === 'GET') {
+        const found = [...plans.values()].find((x) => x.view.approval?.id === approvalPage[1]);
+        if (!found) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } });
+        const a = found.view.approval!;
+        return send(res, 200, {
+          id: a.id,
+          actionPlanId: found.view.id,
+          status: a.status,
+          reason: a.reason,
+          amountUsd: found.view.amountUsd,
+          planHash: found.view.planHash,
+          channel: 'WEB',
+          providerKind: 'dev',
+          expiresAt: a.expiresAt,
+          resolvedAt: null,
+          authTime: null,
+          summary: found.view.summary,
+          devApproveAvailable: true,
+        });
+      }
       if (p === '/triggers') return send(res, 200, TriggersResponseSchema.parse({ triggers: [] }));
       if (p === '/price-overrides')
         return send(res, 200, PriceOverridesResponseSchema.parse({ overrides: [] }));
