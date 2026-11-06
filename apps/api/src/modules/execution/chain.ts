@@ -47,6 +47,12 @@ export interface ChainClient {
   gasPrice?(): Promise<bigint>;
 }
 
+/**
+ * The limit a built transaction runs with. Uniswap's figure can fall short: a Permit2 swap needed
+ * 293,085 against a quoted 277,512 and reverted with no reason. Unused gas is not charged.
+ */
+export const bufferedGas = (limit: string): bigint => (BigInt(limit) * 3n) / 2n;
+
 export class SimulationRevert extends Error {
   override name = 'SimulationRevert';
 }

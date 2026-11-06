@@ -12,6 +12,7 @@ import {
   type SimulatorRunView,
 } from '@warden/shared';
 import { plannerTools, toolSchema } from '../src/modules/agent/planner.js';
+import { bufferedGas } from '../src/modules/execution/chain.js';
 import type { UniswapMcpClient } from '../src/modules/mcp/client.js';
 import { buildOverlay, overlayMcp } from '../src/modules/modeb/simulator/marketOverlay.js';
 import {
@@ -199,6 +200,13 @@ describe('decisions', () => {
     const schema = toolSchema(DecisionDigestSchema) as { properties: Record<string, unknown> };
     expect(Object.keys(schema.properties)).toContain('signalsChecked');
     expect(JSON.stringify(plannerTools)).not.toContain('digest');
+  });
+});
+
+describe('gas limit', () => {
+  it('clears the Permit2 swap that reverted on the quoted limit', () => {
+    expect(bufferedGas('277512')).toBeGreaterThan(293_085n);
+    expect(bufferedGas('277512')).toBe(416_268n);
   });
 });
 

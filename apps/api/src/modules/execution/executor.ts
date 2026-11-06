@@ -58,7 +58,7 @@ import { reasonText, type ApprovalsService } from '../approvals/service.js';
 import type { McpCallContext, UniswapMcpClient } from '../mcp/client.js';
 import type { TraceBus } from '../trace/trace-bus.js';
 import type { WalletProvider } from '../wallet/privy.js';
-import type { ChainClient, ChainReceipt } from './chain.js';
+import { bufferedGas, type ChainClient, type ChainReceipt } from './chain.js';
 import type { JobQueues } from './jobs.js';
 
 export interface ExecutorDeps {
@@ -676,12 +676,13 @@ class StepRunner {
     const index = this.nextIndex();
     const key = `${this.plan.id}:${index}`;
     const tx = step.tx;
+    const gas = tx.gasLimit ? bufferedGas(tx.gasLimit) : null;
     const req = {
       account: getAddress(this.wallet.address),
       to: getAddress(tx.to),
       data: (tx.data || '0x') as Hex,
       value: BigInt(tx.value),
-      ...(tx.gasLimit ? { gas: BigInt(tx.gasLimit) } : {}),
+      ...(gas ? { gas } : {}),
     };
     // Simulate right before broadcast: earlier steps are now real chain state.
     try {
@@ -719,7 +720,7 @@ class StepRunner {
           data: tx.data,
           value: tx.value,
           chainId: tx.chainId,
-          ...(tx.gasLimit ? { gasLimit: tx.gasLimit } : {}),
+          ...(gas ? { gasLimit: gas.toString() } : {}),
         },
         { idempotencyKey: key },
       ));

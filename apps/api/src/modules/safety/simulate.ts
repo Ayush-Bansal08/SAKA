@@ -7,7 +7,7 @@
  * No RPC configured → `unavailable` (the policy engine refuses: fail closed).
  */
 import type { SimulationView } from '@warden/shared';
-import type { ChainClient } from '../execution/chain.js';
+import { bufferedGas, type ChainClient } from '../execution/chain.js';
 
 export interface SimStep {
   kind: string;
@@ -39,7 +39,7 @@ export async function simulateSteps(
       to: step.tx.to as `0x${string}`,
       data: (step.tx.data || '0x') as `0x${string}`,
       value: BigInt(step.tx.value),
-      ...(step.tx.gasLimit ? { gas: BigInt(step.tx.gasLimit) } : {}),
+      ...(step.tx.gasLimit ? { gas: bufferedGas(step.tx.gasLimit) } : {}),
     };
     try {
       await chain.call(req);

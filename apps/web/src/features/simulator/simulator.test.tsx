@@ -3,7 +3,7 @@ import type { SimulatorRunView } from '@warden/shared';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionCard } from './DecisionCard';
-import { isActive } from './hooks';
+import { isActive, runEvents } from './hooks';
 
 const zg = { requestId: 'r', clientRequestId: 'c', model: 'm', trustMode: 'private' } as const;
 const base: SimulatorRunView = {
@@ -89,6 +89,22 @@ describe('DecisionCard', () => {
     card({ ...base, effectiveMode: 'PAPER', notice: 'Paper — not broadcast.' });
     expect(screen.getByText('PAPER')).toBeInTheDocument();
     expect(screen.getByText('Paper — not broadcast.')).toBeInTheDocument();
+  });
+});
+
+describe('runEvents', () => {
+  const event = (id: string, traceId: string, ts: string) =>
+    ({ id, traceId, userId: 'u', ts, kind: 'plan', title: id }) as const;
+
+  it('adds live steps of this run to the stored ones, oldest first, without repeats', () => {
+    const stored = [event('a', 'run-1', '2026-11-06T12:00:00.000Z')];
+    const live = [
+      event('c', 'run-1', '2026-11-06T12:00:02.000Z'),
+      event('x', 'run-2', '2026-11-06T12:00:03.000Z'),
+      event('b', 'run-1', '2026-11-06T12:00:01.000Z'),
+      event('a', 'run-1', '2026-11-06T12:00:00.000Z'),
+    ];
+    expect(runEvents(stored, live, 'run-1').map((e) => e.id)).toEqual(['a', 'b', 'c']);
   });
 });
 

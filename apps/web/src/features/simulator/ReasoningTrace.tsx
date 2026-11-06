@@ -3,13 +3,16 @@ import { Workflow } from 'lucide-react';
 import { EmptyState, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
 import { useTraceEvents } from '@/features/plan/hooks';
 import { EventRow } from '@/features/trace/LiveActivity';
+import { useTraceStream } from '@/features/trace/trace-context';
 import { useNow } from '@/hooks/useNow';
+import { runEvents } from './hooks';
 import { ModeBadge } from './ModeBadge';
 
 export function ReasoningTrace({ runId }: { runId: string | null }) {
   const trace = useTraceEvents(runId);
+  const { events: live } = useTraceStream();
   const now = useNow(10_000);
-  const events = trace.data?.events ?? [];
+  const events = runEvents(trace.data?.events ?? [], live, runId);
   return (
     <Panel
       title="Live trace"

@@ -6,10 +6,12 @@ import {
   type SimulatorMode,
   type SimulatorRunView,
   type SimulatorScenarioId,
+  type TraceEvent,
 } from '@warden/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { useOnTraceEvent } from '@/features/portfolio/hooks';
+import { useTraceStream } from '@/features/trace/trace-context';
 import { api, ApiError } from '@/lib/api';
 
 const keys = {
@@ -40,12 +42,25 @@ export function useRuns() {
       api('/simulator/runs', { schema: SimulatorRunsResponseSchema, signal }),
     refetchInterval: (q) => (q.state.data?.runs.some(isActive) ? 3_000 : false),
   });
+  // The stream is newest first, so this is the latest step of any run on the list.
+  const { events } = useTraceStream();
   const ids = new Set(query.data?.runs.map((r) => r.id));
-  useOnTraceEvent(
-    (e) => ids.has(e.traceId),
-    () => void qc.invalidateQueries({ queryKey: keys.runs }),
-  );
+  const latest = events.find((e) => ids.has(e.traceId))?.id;
+  useEffect(() => {
+    if (latest) void qc.invalidateQueries({ queryKey: keys.runs });
+  }, [latest, qc]);
   return query;
+}
+
+/** One run oldest first: what the server stored plus whatever the stream has delivered since. */
+export function runEvents(
+  stored: readonly TraceEvent[],
+  live: readonly TraceEvent[],
+  runId: string | null,
+): TraceEvent[] {
+  const byId = new Map(stored.map((e) => [e.id, e]));
+  for (const e of live) if (e.traceId === runId) byId.set(e.id, e);
+  return [...byId.values()].sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
 export function useTriggerRun(onStarted: (id: string) => void) {
