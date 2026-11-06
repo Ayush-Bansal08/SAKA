@@ -51,10 +51,7 @@ export function Card({
   );
 }
 
-export function StatCard({
-  className,
-  ...stat
-}: React.ComponentProps<typeof Stat>) {
+export function StatCard({ className, ...stat }: React.ComponentProps<typeof Stat>) {
   return (
     <Card className={cn('p-5', className)}>
       <Stat {...stat} />
