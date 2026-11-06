@@ -1,15 +1,10 @@
-import { riskProfileSettings, usd, type RiskProfile, type UserView } from '@warden/shared';
-import { Bot, MessageSquareText, SendHorizontal, Wallet } from 'lucide-react';
+import type { UserView } from '@warden/shared';
+import { Bot, MessageSquareText, SendHorizontal } from 'lucide-react';
 import { useOutletContext } from 'react-router';
 import { Button } from '@/components/ui/button';
-import { AgentBadge, Badge, EmptyState, Panel, Stat } from '@/components/ui-kit';
+import { AgentBadge, EmptyState, Panel } from '@/components/ui-kit';
+import { PortfolioPanel } from '@/features/portfolio/PortfolioPanel';
 import { LiveActivity } from '@/features/trace/LiveActivity';
-
-const PROFILE_LABEL: Record<RiskProfile, string> = {
-  CAREFUL: 'Careful',
-  BALANCED: 'Balanced',
-  ADVENTUROUS: 'Adventurous',
-};
 
 const EXAMPLE_PROMPTS = [
   'Swap $20 ETH to USDC',
@@ -17,48 +12,6 @@ const EXAMPLE_PROMPTS = [
   'Is this token safe?',
   'Stop loss at $2,800',
 ];
-
-function PortfolioPanel({ user }: { user: UserView }) {
-  const limits = riskProfileSettings(user.riskProfile);
-  return (
-    <Panel id="portfolio" title="Portfolio" icon={<Wallet />} bodyClassName="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-4">
-        <Stat label="Total value" value="—" size="lg" className="col-span-2" hint="No wallet yet" />
-        <Stat label="Today's P&L" value="—" size="sm" />
-        <Stat
-          label="Agent spent today"
-          value={usd(0)}
-          size="sm"
-          hint={`of ${usd(limits.perDayUsd)}`}
-        />
-      </div>
-
-      <div className="rounded-lg border border-border bg-surface-2/50 p-3.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            What the agent may do alone
-          </span>
-          <Badge tone="agent">{PROFILE_LABEL[user.riskProfile]}</Badge>
-        </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <dt className="text-subtle-foreground">Per action</dt>
-          <dd className="text-right font-medium tabular">{usd(limits.perActionUsd)}</dd>
-          <dt className="text-subtle-foreground">Per day</dt>
-          <dd className="text-right font-medium tabular">{usd(limits.perDayUsd)}</dd>
-          <dt className="text-subtle-foreground">Max slippage</dt>
-          <dd className="text-right font-medium tabular">{limits.maxSlippagePct}%</dd>
-        </dl>
-      </div>
-
-      <EmptyState
-        className="flex-1 py-6"
-        icon={<Wallet />}
-        title="Your agent wallet comes next"
-        description="Once your agent wallet is created and funded, balances, P&L and your risk meter live here."
-      />
-    </Panel>
-  );
-}
 
 function AgentPanel({ user }: { user: UserView }) {
   return (
@@ -103,7 +56,7 @@ function AgentPanel({ user }: { user: UserView }) {
         <input
           id="agent-input"
           disabled
-          placeholder="Chat unlocks after your agent wallet is set up"
+          placeholder="Chat with your agent opens in an upcoming release"
           className="h-11 min-w-0 flex-1 rounded-md border border-input bg-surface-2 px-3.5 text-sm placeholder:text-subtle-foreground disabled:cursor-not-allowed"
         />
         <Button type="submit" size="icon" className="size-11" disabled aria-label="Send message">

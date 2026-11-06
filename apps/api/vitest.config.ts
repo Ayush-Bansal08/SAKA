@@ -8,6 +8,9 @@ export default defineConfig({
       '@warden/shared': fileURLToPath(
         new URL('../../packages/shared/src/index.ts', import.meta.url),
       ),
+      'uniswap-agent-mcp': fileURLToPath(
+        new URL('../../packages/uniswap-agent-mcp/src/lib.ts', import.meta.url),
+      ),
     },
   },
   test: {

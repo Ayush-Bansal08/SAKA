@@ -38,6 +38,91 @@ appended to in every phase with concrete friction we hit, with the time and the 
 - **[Setup, 2026-11-06] Testnet prices** — 0.001 ETH quotes 26.35 USDC on Ethereum Sepolia and
   35.51 USDC on Unichain Sepolia, versus 2.25 USDC on mainnet (10–15× off). → USD values and
   limits must use mainnet reference prices, never testnet quotes.
+- **[Setup, 2026-11-06] Unichain Sepolia liquidity** — quotes work, but 0.1 ETH → USDC has 5.7%
+  price impact and 100 USDC → ETH has 6.4%. A V4-only quote returns `NoRouteFoundError`, even
+  though `/lp/pool_info` reports V4 ETH/USDC pools. A pool that exists but can't be routed is
+  confusing; liquidity depth in `pool_info` would help.
+- **[Setup, 2026-11-06] Docs vs spec on LP host** — the LP guide says `/lp/*` lives on
+  `https://liquidity.api.uniswap.org`, while the OpenAPI spec lists them under
+  `https://trade-api.gateway.uniswap.org/v1`. Both hosts answered `/lp/pool_info` identically; the
+  docs should name one canonical host.
+- **[Setup, 2026-11-06] USDC addresses** — the supported-chains page lists routers but not the
+  standard USDC per testnet. We had to look them up and verify them on-chain.
 - **[Setup, 2026-11-06] Invalid key response** — a bad key returns 401 "Unauthenticated api key
   or session". It's clear, but the developer portal could say when a newly created key becomes
   active.
+- **[PHASE 02, 2026-11-06] Universal Router version in the skill** — the swap-integration skill
+  (v1.6.0) tells integrators to send `x-universal-router-version: 2.0` on every request, but the
+  supported-chains page says support for 2.0 and 2.1.1 ended on 2026-10-21. → We pin `2.1.2`
+  (configurable) and check the `/swap` target against the 2.1.2 address from the deployments page.
+- **[PHASE 02] `/swap` body: "spread" vs `{ quote }`** — the skill insists "do NOT wrap the quote
+  in `{quote: …}`, spread the response", while the OpenAPI `CreateSwapRequest` has a required
+  `quote` property. Both describe the same wire shape (spreading the response yields `quote`), but
+  they read as contradictory. → We send `{ quote, permitData?, signature? }` exactly as in the spec.
+- **[PHASE 02] Chain ID types** — the skill says `tokenInChainId`/`tokenOutChainId` "must be
+  strings", but the spec types `ChainId` as a number enum, and numbers work (verified in setup).
+  → We send numbers, as in the spec.
+- **[PHASE 02] `x-agent-info` rules differ** — the skill says all three fields are required and
+  `integration_name` must be `"swap-integration"`. The spec says only `decision_origin` is required
+  and `integration_name` should name _your_ integration. → We follow the skill
+  (`swap-integration` / `lp-integration` plus the skill version), with `decision_origin` set from
+  config.
+- **[PHASE 02] LP `priceBounds.quotedTokenAddress`** — the lp-integration skill says it is required
+  (omitting it returns 400), but it is missing from the OpenAPI `PositionPriceBounds`, and the LP
+  guide's `/lp/create` examples omit it. → We compute tick bounds ourselves (snapped to the pool's
+  tickSpacing) and send `tickBounds`. The response still returns `adjustedMinPrice/MaxPrice`.
+- **[PHASE 02] LP contract gaps** — `kycRequiredWarnings` (skill) is not in `LPApprovalResponse`.
+  `PoolReferenceByProtocol` lists `required: ["poolAddress"]`, but the only property is
+  `referenceIdentifier`. The guide's prose spells `token0address` while the examples use
+  `token0Address`. → Our types follow the spec plus the skill's additions.
+- **[PHASE 02] v4 batch permit is not EIP-712-ready** — `v4BatchPermitData` arrives proto-encoded:
+  `domain.chainId` is an enum name and every type is wrapped in `{ fields: [...] }`. The spec types
+  it as a plain `object`, and only the skill documents the shape. → We normalise it for signing,
+  derive `primaryType`, and send the original object back to `/lp/create`. A signing-ready shape
+  (or a documented schema) would remove a whole class of bugs.
+- **[PHASE 02] `/lp/pool_info` listing semantics** — `poolParameters.fee`/`tickSpacing` are
+  described as "must be provided for V3 or V4", yet `pageSize`/`currentPage` suggest that pools for
+  a pair can be listed. It is unclear whether hook pools for a pair can be listed without knowing
+  the fee. → We try without a fee, then fall back to the standard hookless tiers.
+- **[PHASE 02] `@uniswap/v4-sdk@2.4.1` ESM build fails in Node** — `import '@uniswap/v4-sdk'`
+  throws `ERR_UNSUPPORTED_DIR_IMPORT`, because `dist/esm/src/index.js` does
+  `export * from './entities'`. → We load the CJS build with `createRequire` (typed with
+  `import type`). The SDK also pulls `hardhat` into the install tree through peer dependencies,
+  which is heavy for an app.
+- **[PHASE 02] Missing facts in the vendored docs** — the deployments page has no PoolManager
+  deployment block (needed to scan `Initialize` logs), and no WETH for Sepolia. The CCA skill lists
+  the Unichain _mainnet_ USDC (`0x078D…`) for Unichain Sepolia 1301. → We discover the start block
+  with an `eth_getCode` binary search. Sepolia WETH and 1301 USDC are left unset and fail loudly
+  (`NOT_CONFIGURED`).
+- **[PHASE 02] Two hook risk scales** — the Security Framework (nine dimensions, 0–33; tiers
+  0–6 / 7–17 / 18–33) and the v4-security-foundations skill (five categories, 0–33; tiers 0–5 /
+  6–12 / 13–20 / 21–33) define different scores and cutoffs. Neither gives per-permission points
+  (the skill gives "Permissions 0–14" without weights). Both are self-assessments, not something a
+  third party can compute on-chain. → `score_hook` uses an explicit 100-point penalty model, with
+  each rule citing its framework/skill section, and reports the §4 feature triggers plus an
+  observable lower bound of the skill's score. An official, machine-checkable "integrator view"
+  of hook risk would help agents a lot.
+- **[PHASE 02, 2026-11-06, live smoke] Subgraph still unavailable** — the official v4 subgraph
+  (`DiYPVdyg…`) still fails on every indexer (`BadResponse(no attestation: indexing_error)`; one
+  indexer reports "too far behind"). Every market-data tool built on the official subgraph is down
+  for integrators. → The tools return a labelled, retryable `SUBGRAPH_UNAVAILABLE`; hooks are
+  found from PoolManager `Initialize` logs over RPC instead. A status page or a fallback endpoint
+  for the official subgraph would help.
+- **[PHASE 02, 2026-11-06, live smoke] Sepolia liquidity drift** — `/quote` for 0.001 ETH → USDC
+  on Sepolia now routes through a 0.9% pool with 34% price impact (0.02–0.2% earlier the same day).
+  Testnet routing quality changes from hour to hour, which makes testnet demos fragile. →
+  Mainnet is used for reference prices; liquidity on the execution chain needs topping up before
+  the demo.
+- **[PHASE 02, 2026-11-06] Root cause of the v4 subgraph outage** — the indexers' `/status`
+  endpoints all report the same deterministic, non-fatal mapping error in deployment
+  `QmZsgJLiLQKpb8hxTmQ5LWyrFVvfWzVaL4WK8dfFBn7EeK` (subgraph `DiYPVdyg…`): `handleSwap` →
+  `handleSwapHelper`, `src/mappings/swap.ts` line 39, "unexpected null", at block 26315771 (tx
+  `0x25cb1ab8…2495`, 2026-10-31 22:36 UTC). That transaction is a contract creation which
+  initialises two fee-0 ETH pools for brand-new tokens and swaps in them in the same transaction
+  (pools `0x30899c9e…aaed`, `0x9c1d89af…efee`). `handleSwap` then appears to load a Pool/Token
+  entity that does not exist. The subgraph keeps syncing, but it is flagged unhealthy, indexers
+  refuse to attest, and every gateway query fails, including with `subgraphError: allow`. The
+  current `main` of Uniswap/v4-subgraph has null-checks in `swap.ts`, so a patched mapping seems
+  to exist but has not been deployed. → One hostile or odd transaction took down the official
+  data source for every integrator for 5+ days. A null-safe `handleSwap` plus a redeploy fixes it;
+  monitoring `hasIndexingErrors` would catch it.

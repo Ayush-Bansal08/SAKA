@@ -14,6 +14,7 @@ export default tseslint.config(
       '**/.turbo/**',
       'docs/vendor/**',
       'apps/api/prisma/migrations/**',
+      'packages/uniswap-agent-mcp/src/generated/**',
     ],
   },
   js.configs.recommended,

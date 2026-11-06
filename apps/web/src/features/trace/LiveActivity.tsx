@@ -126,7 +126,9 @@ const TimelineItem = memo(function TimelineItem({
           {meta.label}
         </p>
         {event.detail && (
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{event.detail}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+            {event.detail}
+          </p>
         )}
 
         {event.zg && (

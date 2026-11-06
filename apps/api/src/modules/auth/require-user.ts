@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import { activityKey } from '../../lib/activity.js';
 import { AppError } from '../../lib/errors.js';
 import { bearerToken, type AuthContext } from './session-service.js';
 
@@ -17,6 +18,22 @@ export async function requireUser(request: FastifyRequest, _reply: FastifyReply)
     throw new AppError('SESSION_EXPIRED', 401, 'Your session has expired. Please sign in again.');
   }
   request.auth = auth;
+  markActive(request, auth.user.id);
+}
+
+/** Balance-watcher back-off reads this key (absent → inactive for more than 24 h). */
+export const ACTIVITY_TTL_SECONDS = 24 * 3_600;
+const ACTIVITY_THROTTLE_MS = 60_000;
+const lastMarked = new Map<string, number>();
+
+function markActive(request: FastifyRequest, userId: string): void {
+  const now = Date.now();
+  if (now - (lastMarked.get(userId) ?? 0) < ACTIVITY_THROTTLE_MS) return;
+  lastMarked.set(userId, now);
+  if (lastMarked.size > 10_000) lastMarked.clear();
+  void request.server.deps.redis
+    .set(activityKey(userId), String(now), 'EX', ACTIVITY_TTL_SECONDS)
+    .catch(() => undefined);
 }
 
 /** Returns the authenticated context inside a handler guarded by `requireUser`. */

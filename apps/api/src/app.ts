@@ -23,9 +23,15 @@ import { createIdentityProvider } from './modules/auth/providers.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { SessionService } from './modules/auth/session-service.js';
 import { healthRoutes } from './modules/health/routes.js';
+import { createUniswapMcpClient, type UniswapMcpClient } from './modules/mcp/client.js';
 import { TraceBus } from './modules/trace/trace-bus.js';
 import { traceRoutes } from './modules/trace/routes.js';
 import { userRoutes } from './modules/users/routes.js';
+import { onboardingRoutes } from './modules/users/onboarding-routes.js';
+import { settingsRoutes } from './modules/users/settings-routes.js';
+import { BalanceReader, PriceService } from './modules/portfolio/market.js';
+import { portfolioRoutes } from './modules/portfolio/routes.js';
+import { createWalletProvider, type WalletProvider } from './modules/wallet/privy.js';
 
 export interface AppDeps {
   env: Env;
@@ -34,7 +40,22 @@ export interface AppDeps {
   traceBus: TraceBus;
   sessions: SessionService;
   identity: IdentityProvider;
+  /** Uniswap agent MCP client (null when MCP_AUTH_TOKEN is not configured). */
+  mcp: UniswapMcpClient | null;
+  /** Privy agent wallets (null when PRIVY_APP_ID / PRIVY_APP_SECRET are not configured). */
+  wallets: WalletProvider | null;
+  /** Mainnet reference prices via MCP get_quote (PriceCache, 30 s). */
+  prices: PriceService;
+  /** Execution-chain balances via MCP get_portfolio (short Redis cache). */
+  balances: BalanceReader;
   log: FastifyBaseLogger;
+}
+
+export interface BuildAppOverrides {
+  /** Replace the Privy wallet provider (tests). */
+  wallets?: WalletProvider | null;
+  /** Replace the MCP client (tests). */
+  mcp?: UniswapMcpClient | null;
 }
 
 declare module 'fastify' {
@@ -47,6 +68,7 @@ export interface BuildAppOptions {
   env: Env;
   /** Use a shared Redis store for rate limits (multi-instance). Defaults to true outside tests. */
   redisRateLimit?: boolean;
+  overrides?: BuildAppOverrides;
 }
 
 const REQUEST_ID_RE = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -74,10 +96,32 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   const log = app.log;
   const traceBus = new TraceBus(prisma, redis, log.child({ module: 'trace' }));
+  const mcp =
+    options.overrides?.mcp !== undefined
+      ? options.overrides.mcp
+      : createUniswapMcpClient(env, { trace: traceBus, log: log.child({ module: 'mcp' }) });
+  const wallets =
+    options.overrides?.wallets !== undefined
+      ? options.overrides.wallets
+      : createWalletProvider(env, log.child({ module: 'privy' }));
+  const prices = new PriceService(prisma, mcp, log.child({ module: 'prices' }));
+  const balances = new BalanceReader(mcp, redis);
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
-  app.decorate('deps', { env, prisma, redis, traceBus, sessions, identity, log });
+  app.decorate('deps', {
+    env,
+    prisma,
+    redis,
+    traceBus,
+    sessions,
+    identity,
+    mcp,
+    wallets,
+    prices,
+    balances,
+    log,
+  });
   app.decorateRequest('auth', null);
 
   registerErrorHandling(app);
@@ -114,8 +158,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await app.register(authRoutes);
   await app.register(userRoutes);
   await app.register(traceRoutes);
+  await app.register(onboardingRoutes);
+  await app.register(portfolioRoutes);
+  await app.register(settingsRoutes);
 
   app.addHook('onClose', async () => {
+    await mcp?.close();
     await traceBus.close();
     await Promise.allSettled([prisma.$disconnect(), redis.quit()]);
   });

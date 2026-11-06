@@ -6,3 +6,10 @@ export * from './cards.js';
 export * from './intent.js';
 export * from './money.js';
 export * from './api.js';
+export * from './portfolio.js';
+/**
+ * Uniswap agent MCP tool schemas (16 tools + TxStep/SignatureRequest/BuildResult). This module is a
+ * byte-for-byte mirror of packages/uniswap-agent-mcp/src/schemas.ts (sync: pnpm --filter
+ * uniswap-agent-mcp sync:shared); test/uniswap-mcp-mirror.test.ts fails on drift.
+ */
+export * as UniswapMcp from './uniswap-mcp.js';

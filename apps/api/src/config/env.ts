@@ -32,6 +32,35 @@ const encryptionKey = z
 
 const providerMode = z.enum(['dev', 'world']);
 
+export const AllowlistEntrySchema = z.object({
+  chainId: z.number().int().positive(),
+  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'must be a 0x address'),
+  symbol: z.string().trim().min(1).max(20),
+  decimals: z.number().int().min(0).max(36),
+  referenceSymbol: z.string().trim().min(1).max(20).optional(),
+});
+export type AllowlistEntry = z.infer<typeof AllowlistEntrySchema>;
+
+/** TOKEN_ALLOWLIST_JSON: a JSON array of extra tokens (verified on-chain by the human first). */
+const tokenAllowlist = z.string().transform((raw, ctx): AllowlistEntry[] => {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'must be a JSON array' });
+    return z.NEVER;
+  }
+  const parsed = z.array(AllowlistEntrySchema).safeParse(json);
+  if (!parsed.success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `invalid entry: ${parsed.error.issues[0]?.path.join('.')} ${parsed.error.issues[0]?.message}`,
+    });
+    return z.NEVER;
+  }
+  return parsed.data;
+});
+
 export const EnvSchema = z.object({
   // --- core -----------------------------------------------------------------
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -70,6 +99,35 @@ export const EnvSchema = z.object({
 
   // --- admin ----------------------------------------------------------------
   ADMIN_TOKEN: z.string().min(24, 'must be at least 24 characters'),
+
+  // --- Uniswap agent MCP server (PHASE 02) ------------------------------------
+  /** Streamable HTTP endpoint of packages/uniswap-agent-mcp. */
+  MCP_URL: urlWithoutTrailingSlash.default('http://localhost:3002/mcp'),
+  /** Bearer token for the MCP server. Without it the API runs with Uniswap tools disabled. */
+  MCP_AUTH_TOKEN: z.string().min(24, 'must be at least 24 characters').optional(),
+  /** Extra allowlisted tokens (same JSON the MCP server reads); used for the Privy policy. */
+  TOKEN_ALLOWLIST_JSON: tokenAllowlist.default('[]'),
+  /** Universal Router version the MCP server builds for (Privy policy allowlist). */
+  UNISWAP_UNIVERSAL_ROUTER_VERSION: z.enum(['2.1.2', '2.2.0']).default('2.1.2'),
+
+  // --- Privy agent wallets (PHASE 03) ----------------------------------------
+  /** Without PRIVY_APP_ID + PRIVY_APP_SECRET, wallet creation answers 503 (WALLET_PROVIDER_ERROR). */
+  PRIVY_APP_ID: z.string().trim().min(1).optional(),
+  PRIVY_APP_SECRET: z.string().trim().min(1).optional(),
+  /** Only when the Privy dashboard requires signed requests (authorization key, `wallet-auth:` PKCS8). */
+  PRIVY_AUTHORIZATION_PRIVATE_KEY: z.string().trim().min(1).optional(),
+  /** Execution-chain RPC (smoke scripts and receipt checks; Privy broadcasts on its own). */
+  EXECUTION_RPC_URL: urlWithoutTrailingSlash.optional(),
+
+  // --- onboarding & balance watcher (PHASE 03) -------------------------------
+  /** Testnet ETH faucet shown in onboarding (defaults to a known faucet for the chain). */
+  FAUCET_ETH_URL: z.string().url().optional(),
+  /** Testnet USDC faucet shown in onboarding. */
+  FAUCET_USDC_URL: z.string().url().default('https://faucet.circle.com'),
+  /** How often the worker polls balances of active users (ms). */
+  BALANCE_POLL_MS: z.coerce.number().int().min(5_000).max(600_000).default(15_000),
+  /** Poll interval for users inactive for more than 24 h (ms). */
+  BALANCE_POLL_INACTIVE_MS: z.coerce.number().int().min(15_000).max(3_600_000).default(300_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

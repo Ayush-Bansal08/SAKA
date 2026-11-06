@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { buildApp } from '../src/app.js';
+import { buildApp, type BuildAppOverrides } from '../src/app.js';
 import { loadEnv, type Env } from '../src/config/env.js';
 
 import { TEST_DATABASE_URL, TEST_REDIS_URL } from './constants.js';
@@ -33,8 +33,15 @@ export function testEnv(overrides: Record<string, string | undefined> = {}): Env
   return loadEnv(testEnvSource(overrides));
 }
 
-export async function createTestApp(overrides: Record<string, string | undefined> = {}) {
-  const app = await buildApp({ env: testEnv(overrides), redisRateLimit: false });
+export async function createTestApp(
+  overrides: Record<string, string | undefined> = {},
+  deps?: BuildAppOverrides,
+) {
+  const app = await buildApp({
+    env: testEnv(overrides),
+    redisRateLimit: false,
+    ...(deps ? { overrides: deps } : {}),
+  });
   await app.ready();
   return app;
 }

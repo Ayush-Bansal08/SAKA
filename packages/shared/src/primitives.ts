@@ -7,6 +7,13 @@ export const DecimalStringSchema = z
   .regex(/^(0|[1-9]\d*)(\.\d+)?$/, 'Must be a non-negative decimal number string');
 export type DecimalString = z.infer<typeof DecimalStringSchema>;
 
+/** Signed decimal number string (P&L, percentage changes), e.g. "-12.5". Never a JS number. */
+export const SignedDecimalStringSchema = z
+  .string()
+  .trim()
+  .regex(/^-?(0|[1-9]\d*)(\.\d+)?$/, 'Must be a decimal number string');
+export type SignedDecimalString = z.infer<typeof SignedDecimalStringSchema>;
+
 /** 0x-prefixed 20-byte hex address (checksum is validated/normalised server-side with viem). */
 export const AddressSchema = z
   .string()

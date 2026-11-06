@@ -24,7 +24,18 @@ The image also has a generic entry, `node dist/main.js`, that picks the process 
    - `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `REDIS_URL=${{Redis.REDIS_URL}}`
    - `ENCRYPTION_KEY` (`openssl rand -base64 32`), `ADMIN_TOKEN` (`openssl rand -hex 32`)
    - `EXECUTION_CHAIN_ID`, `AUTH_MODE=world`, `APPROVAL_MODE=world`, `ALLOW_DEV_PROVIDERS=false`
+   - PHASE 03: `PRIVY_APP_ID`, `PRIVY_APP_SECRET` (+ `PRIVY_AUTHORIZATION_PRIVATE_KEY` only if the
+     Privy dashboard requires signed requests), `MCP_URL` + `MCP_AUTH_TOKEN` on **both** api and
+     worker (the worker's balance watcher reads balances through MCP), optionally
+     `FAUCET_ETH_URL`, `FAUCET_USDC_URL`, `TOKEN_ALLOWLIST_JSON`
 4. The api's `preDeployCommand` runs `prisma migrate deploy` before every release.
+5. **`mcp` service** (its own image: `packages/uniswap-agent-mcp/Dockerfile`, config
+   `deploy/railway/mcp.json`). Keep it private (Railway private networking) and point the api's
+   `MCP_URL` at `http://mcp.railway.internal:${PORT}/mcp`. Variables:
+   - `UNISWAP_API_KEY`, `EXECUTION_CHAIN_ID`, `EXECUTION_RPC_URL`, `MAINNET_RPC_URL`,
+     `THEGRAPH_API_KEY`, `ETHERSCAN_API_KEY` (optional)
+   - `MCP_AUTH_TOKEN` (same value on `api` and `mcp`), `MCP_RESUME_SECRET` (`openssl rand -hex 32`)
+   - Railway sets `PORT`; the health check is `GET /health`.
 
 > Production refuses to boot with dev identity/approval providers. Until World ID lands in
 > PHASE 10, there is no production mode to deploy (by design).

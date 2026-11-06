@@ -1,10 +1,11 @@
 /**
- * Decides what the whole app renders: splash → API error → sign-in → signed-in shell.
+ * Decides what the whole app renders: splash → API error → sign-in → onboarding → shell.
  * The shell (and the single SSE connection) only mounts with a valid session.
  */
 import { ErrorState } from '@/components/ui-kit';
 import { useMe, useProviders, useSessionToken } from '@/features/auth/hooks';
 import { SignInPage } from '@/features/auth/SignInPage';
+import { OnboardingWizard } from '@/features/onboarding/OnboardingWizard';
 import { TraceStreamProvider } from '@/features/trace/TraceStreamProvider';
 import { AppShell } from '@/layout/AppShell';
 import { LogoMark } from '@/layout/Logo';
@@ -62,7 +63,11 @@ export function AuthGate() {
 
   return (
     <TraceStreamProvider token={token}>
-      <AppShell providers={providers.data} user={me.data} />
+      {me.data.onboardingStep === 'DONE' ? (
+        <AppShell providers={providers.data} user={me.data} />
+      ) : (
+        <OnboardingWizard providers={providers.data} user={me.data} />
+      )}
     </TraceStreamProvider>
   );
 }

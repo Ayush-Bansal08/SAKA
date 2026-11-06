@@ -16,10 +16,16 @@ apps/api  (Fastify 5, Node 22)
    ├─ modules/trace        TraceBus: Postgres persistence + Redis pub/sub → SSE /stream [P01]
    ├─ modules/approvals    ApprovalProvider interface (workflow in a later phase)        [P01]
    ├─ modules/health       /health (db + redis)                                          [P01]
-   └─ … agent, ai0g, mcp, safety, policy, execution, decisionlog, triggers, modeb …   [P02+]
-apps/api worker entry       BullMQ: system heartbeat (Mode B detectors from P07)        [P01]
+   ├─ modules/mcp          UniswapMcpClient: streamable HTTP + bearer, shared-schema    [P02]
+   │                       validation, tool_call/tool_result trace events
+   ├─ modules/wallet       Privy adapter (the only Privy caller), agent wallet service  [P03]
+   ├─ modules/users        + onboarding state machine, settings (changes → STEP_UP)     [P03]
+   ├─ modules/portfolio    balances (MCP get_portfolio), prices (MCP get_quote mainnet), [P03]
+   │                       FIFO P&L, deterministic risk meter, daily limit usage
+   └─ … agent, ai0g, safety, policy, execution, decisionlog, triggers, modeb …        [P04+]
+apps/api worker entry       BullMQ: system heartbeat [P01] · balance watcher, 15 s [P03]
 packages/shared             Zod schemas + types shared by api / web / mcp                [P01]
-packages/uniswap-agent-mcp  Uniswap MCP server                                           [P02]
+packages/uniswap-agent-mcp  Uniswap MCP server: 16 tools, unsigned-only, :3002/mcp      [P02]
 Postgres 16 + Redis 7       docker compose locally; Railway plugins in deploy
 ```
 
@@ -30,7 +36,7 @@ Postgres 16 + Redis 7       docker compose locally; Railway plugins in deploy
 | `packages/shared`            | `policy.ts` (risk profiles, score + policy constants), `chains.ts`, `trace.ts`, `cards.ts`, `intent.ts`, `money.ts`, `api.ts` (HTTP contract) |
 | `apps/api`                   | HTTP server (`src/server.ts`), worker (`src/worker.ts`), container entry (`src/main.ts`)                                                      |
 | `apps/web`                   | React 19 + Vite 6 SPA: design system, shell, auth flow, live activity                                                                         |
-| `packages/uniswap-agent-mcp` | Placeholder until PHASE 02                                                                                                                    |
+| `packages/uniswap-agent-mcp` | Standalone MCP server (HTTP + stdio): 16 Uniswap tools, unsigned transactions only. See its README and PLUGIN.md                              |
 
 Workspace sources are consumed directly in development and tests: `@warden/shared` exports a
 custom `@warden/source` condition (TypeScript `customConditions`, `tsx --conditions`) and Vite
@@ -103,6 +109,125 @@ aliases it to `src/`. Production builds compile `shared` to `dist/` first (Turbo
 `AgentRequest`, `Inference`, `ActionPlan`, `Approval`, `Execution`, `DecisionLog`, `LpPosition`,
 `TokenLot`, `Trigger`, `Suggestion`, `Hook`, `HookPool`, `PriceCache`, `TraceEventRow`.
 USD amounts are `Decimal`. Raw uint256 token amounts are decimal strings.
+
+## Uniswap agent MCP server (PHASE 02)
+
+`packages/uniswap-agent-mcp` is a standalone, open-source MCP server (it does not depend on any
+Warden package, so it can be copied into a fork of `Uniswap/uniswap-ai`).
+
+```
+apps/api ──callTool──▶ UniswapMcpClient ──POST /mcp (Bearer MCP_AUTH_TOKEN)──▶ uniswap-agent-mcp :3002
+   ▲  validates output with @warden/shared UniswapMcp.*        │  tools/<name>.ts (Zod in/out)
+   └─ TraceBus: "Uniswap · get_quote" (tool_call/tool_result)  ├─ Trading API  /check_approval /quote /swap
+                                                               ├─ LP API       /lp/check_approval /create /decrease /claim_fees /pool_info
+                                                               ├─ viem RPC     V4Quoter, StateView, PositionManager, PoolManager logs
+                                                               ├─ v4 subgraph  (mainnet market data)
+                                                               └─ Etherscan v2 (optional, verified source)
+```
+
+- **Unsigned only.** Build tools return `READY` (ordered `TxStep`s) or `NEEDS_SIGNATURE`
+  (approval preSteps, EIP-712 typed data and an HMAC `resumeToken` valid for 120 s). The backend
+  signs with its own wallet layer (later phases) after its safety and policy checks, then calls the
+  same tool again with `resumeToken` + `signature`.
+- **One schema file, mirrored.** `packages/uniswap-agent-mcp/src/schemas.ts` (zod only) is copied
+  byte-for-byte to `packages/shared/src/uniswap-mcp.ts` (`UniswapMcp` namespace). A shared test
+  fails on drift (`pnpm --filter uniswap-agent-mcp sync:shared`).
+- **Addresses** come only from the vendored docs (`src/chains.ts`). A missing one (for example
+  Sepolia WETH) fails with `NOT_CONFIGURED`.
+- **USD values** come from mainnet reference quotes (1 token → USDC, cached 30 s).
+- **Market data failover** (`src/market/`). Each capability has an ordered chain of independent
+  sources:
+  - pools / TVL / APR: official subgraph → pool registry + LP API reserves + GeckoTerminal volume
+    → GeckoTerminal
+  - price history: official subgraph → StateView at historical blocks → GeckoTerminal
+  - hooks: official subgraph → pool registry → PoolManager logs
+
+  The official subgraph is skipped while `hasIndexingErrors` is true, and failed sources cool
+  down for 60 s. Outputs name the source used. `pnpm check:sources` diagnoses live.
+
+- **API wiring:** `app.deps.mcp` is created when `MCP_AUTH_TOKEN` is set and connects lazily. It
+  reconnects once on transport failure and maps tool errors to `McpToolCallError { code, retryable }`.
+- **Processes:** `pnpm dev` runs the server on :3002 (`node --watch --import tsx`). In production it is its own
+  image (`packages/uniswap-agent-mcp/Dockerfile`, `deploy/railway/mcp.json`).
+
+## Agent wallet, onboarding and portfolio (PHASE 03)
+
+**Privy adapter** (`apps/api/src/modules/wallet/privy.ts`) — the only file that imports
+`@privy-io/node` (v0.36.0; method names checked against its TypeScript types). It exposes
+`createAgentWallet`, `attachPolicy`, `sendTransaction`, `signTypedData` and `getAddress`, and maps
+every failure to `AppError('WALLET_PROVIDER_ERROR')` (503 when retryable, 502 otherwise). SDK calls
+sit behind a small `PrivyBackend` seam so tests use an in-memory fake.
+
+- **Wallets** are app-controlled server wallets (no owner). Creation is idempotent at both ends:
+  Privy `external_id = warden_<userId>` (looked up first, plus an idempotency key), and
+  `AgentWallet.userId` is unique in Postgres. Concurrent creates (two tabs) converge: a Privy 409
+  or "idempotency key still in progress" waits and re-reads the winner.
+- **Policy** — one per wallet, named by a hash of its rules (so it is found again, never
+  duplicated). It ALLOWs only: `eth_sendTransaction` to Universal Router, Permit2, v4
+  PositionManager and allowlisted tokens on `EXECUTION_CHAIN_ID`; a zero-value self-transaction
+  (liveness probe / stuck-nonce cancel); `eth_signTypedData_v4` for the Permit2 / PositionManager
+  domains. Anything else is denied by Privy. If the policy API is unavailable, the adapter logs a
+  warning and stores `policyId = null`; the backend policy engine remains the primary guard.
+- **Addresses** come from `EXECUTION_CONTRACTS` in `@warden/shared`, a mirror of the MCP
+  server's vendor-doc `chains.ts`; `apps/api/test/portfolio-math.test.ts` fails on any drift.
+- `PRIVY_AUTHORIZATION_PRIVATE_KEY` is passed as `authorization_context` only when set.
+
+**Onboarding state machine** on `User.onboardingStep`, all transitions compare-and-set:
+
+```
+VERIFY ─sign-in─▶ WALLET ─POST /onboarding/wallet─▶ PROFILE ─POST /onboarding/profile─▶ FUND
+FUND ─balance watcher: first native deposit─▶ DONE
+```
+
+The profile may be re-picked during PROFILE/FUND; after DONE every change is `409
+STEP_UP_REQUIRED` (as are `PUT /settings/risk-profile`, `PUT /settings/limits`,
+`POST /wallet/withdraw`) until approvals (P05) and World ID (P10) exist.
+
+**Balance watcher** (worker, BullMQ `wallet` queue, every `BALANCE_POLL_MS`): per wallet, reads
+balances with MCP `get_portfolio`, compares with the Redis snapshot `balances:snapshot:<userId>`,
+and records increases as `TokenLot(source=DEPOSIT, cost = amount × mainnet reference price)`
+plus a `receipt` trace event. Increases within 2 min of one of our own `Execution` rows are
+treated as explained. Per-user Redis lock; lots are written before the snapshot (a crash
+re-detects rather than loses). Users with no API activity for 24 h (`activity:<userId>` key set
+by `requireUser`) are polled every `BALANCE_POLL_INACTIVE_MS`.
+
+**Portfolio** (`GET /portfolio`): balances (MCP `get_portfolio`, 10 s shared Redis cache) ×
+reference prices (MCP `get_quote` on mainnet, 1 token → USDC, cached 30 s in `PriceCache`),
+FIFO P&L over `TokenLot` (an unexplained balance shortfall such as gas is consumed FIFO at zero
+proceeds; untracked excess is left out of P&L), the risk meter, and today's AUTO spend in the
+user's time zone. The risk meter (`modules/portfolio/risk.ts`) is deterministic: concentration
+0.30, stablecoin buffer 0.20, LP out of range 0.15, hook exposure 0.15, drawdown vs 7-day high
+0.20 (MCP `get_price_history`, best-effort within 3 s; weights re-normalise without it); any
+Danger-hook exposure floors the score at High. Background MCP reads pass `quiet: true` so they
+never appear in the user's live activity.
+
+**Web**: `AuthGate` shows a full-screen `OnboardingWizard` until the step is DONE (verified
+human → animated wallet creation → profile cards → fund with QR, copy and faucets, polling every
+4 s plus the live trace stream). The cockpit's Portfolio column and the Settings page read
+`/portfolio` (every 15 s and on `receipt`/`tx` events) and `/settings`.
+
+## Execution chain (decided 2026-11-06)
+
+**Ethereum Sepolia, chain ID `11155111`** (`EXECUTION_CHAIN_ID`, the default).
+
+| Token / contract                | Address                                      |
+| ------------------------------- | -------------------------------------------- |
+| Native ETH (Uniswap API)        | `0x0000000000000000000000000000000000000000` |
+| USDC (Circle, 6 decimals)       | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
+| WETH (for v3 pools)             | `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14` |
+| Universal Router (from `/swap`) | `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` |
+
+Results of `pnpm smoke:uniswap` on each candidate chain. A check passes only if it succeeds with
+price impact ≤ 5%, the policy's refuse limit.
+
+| Chain                       | Checks passed | Notes                                                                                              |
+| --------------------------- | ------------- | -------------------------------------------------------------------------------------------------- |
+| Ethereum Sepolia (11155111) | **12/12**     | ETH→USDC 0.02–0.2% impact up to 0.1 ETH; USDC→ETH 1.6–2.3% (thin v4 pools); V3 + V4 LP pools exist |
+| Unichain Sepolia (1301)     | 9/12          | 0.1 ETH→USDC 5.7% and 100 USDC→ETH 6.4% impact (would be refused); no V4-only route                |
+| Base Sepolia (84532)        | 4/11          | every `/quote` returns `UpstreamTimeoutError`; only approvals and pool info work                   |
+
+Testnet prices are 10–15× off mainnet (0.001 ETH ≈ 26 USDC on Sepolia vs 2.25 on mainnet), so USD
+values always come from mainnet reference prices.
 
 ## Deploy
 
