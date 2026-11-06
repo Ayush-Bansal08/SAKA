@@ -4,7 +4,7 @@
  * when older than 1 h. The LLM never scores hooks; it only explains them (P07).
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { hookBand, type HookBand } from '@warden/shared';
+import { hookBand, type HookBand, type UniswapMcp } from '@warden/shared';
 import { getAddress } from 'viem';
 import type { McpCallContext, UniswapMcpClient } from '../mcp/client.js';
 
@@ -39,7 +39,18 @@ export async function gateHook(
     return { address, score: cached.score, band: hookBand(cached.score), cached: true };
 
   const scored = await deps.mcp.callTool('score_hook', { chainId, hookAddress: address }, ctx);
-  const data = {
+  const data = hookRowData(scored, now);
+  await deps.prisma.hook.upsert({
+    where: { chainId_address: { chainId, address } },
+    create: { chainId, address, ...data },
+    update: data,
+  });
+  return { address, score: scored.score, band: scored.band, cached: false };
+}
+
+/** Hook row columns from a score_hook result (shared with the hook indexer). */
+export function hookRowData(scored: UniswapMcp.ToolOutput<'score_hook'>, now: Date) {
+  return {
     flags: json(scored.enabledPermissions),
     permissions: json(scored.permissions),
     isProxy: scored.facts.proxy.kind !== null,
@@ -56,11 +67,7 @@ export async function gateHook(
       scoredAt: scored.scoredAt,
     }),
     lastCheckedAt: now,
+    contractName: scored.facts.contractName,
+    ageDays: scored.facts.ageDays,
   };
-  await deps.prisma.hook.upsert({
-    where: { chainId_address: { chainId, address } },
-    create: { chainId, address, ...data },
-    update: data,
-  });
-  return { address, score: scored.score, band: scored.band, cached: false };
 }

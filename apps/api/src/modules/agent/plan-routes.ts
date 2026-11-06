@@ -1,5 +1,6 @@
 /**
  * Plan routes (PHASE 05 §7). Owner only.
+ *   GET  /plans                activity list (outcome / type / date filters, cursor paging)
  *   GET  /plans/:id            everything for the detail views
  *   POST /plans/:id/cancel     stop an AUTO plan during its countdown (atomic: only while QUEUED)
  *   POST /plans/:id/repreview  fresh preview of the same intent after "Price moved" (new plan,
@@ -10,15 +11,24 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { ActionIntentSchema, Decimal, type DecisionLogView, type PlanView } from '@warden/shared';
+import {
+  ActionIntentSchema,
+  Decimal,
+  PlanListQuerySchema,
+  type DecisionLogView,
+  type PlanListResponse,
+  type PlanOutcome,
+  type PlanView,
+} from '@warden/shared';
 import { devProvidersAllowed } from '../../config/env.js';
 import { AppError } from '../../lib/errors.js';
 import { authOf, requireUser } from '../auth/require-user.js';
 import { buildPortfolio } from '../portfolio/service.js';
 import { patchPlanCards, setPreviewStatus } from './card-store.js';
-import { planView } from './plan-view.js';
+import { planListItem, planView } from './plan-view.js';
 import { runPipeline, type PipelineDeps } from './pipeline.js';
 import { decisionLogExplorerUrl } from '../decisionlog/service.js';
+import { planSettled } from '../modeb/suggestions.js';
 import type { AppDeps } from '../../app.js';
 
 const Params = z.object({ id: z.string().min(1).max(100) });
@@ -52,12 +62,100 @@ export const planRoutes: FastifyPluginAsyncZod = async (app) => {
         approval: true,
         executions: { orderBy: { stepIndex: 'asc' } },
         decisionLog: true,
-        agentRequest: true,
+        agentRequest: { include: { inferences: { orderBy: { createdAt: 'asc' } } } },
       },
     });
     if (!plan) throw AppError.notFound('Plan not found.');
     return plan;
   };
+
+  /** Prisma filter for an activity outcome (mirrors planOutcome()). */
+  const outcomeWhere = (o: PlanOutcome): Prisma.ActionPlanWhereInput => {
+    switch (o) {
+      case 'EXECUTED':
+      case 'REFUSED':
+      case 'FAILED':
+        return { status: o };
+      case 'EXPIRED':
+        return {
+          OR: [
+            { status: 'EXPIRED' },
+            { status: 'CANCELLED', approval: { is: { status: 'EXPIRED' } } },
+          ],
+        };
+      case 'DENIED':
+        return {
+          status: 'CANCELLED',
+          approval: { is: { status: { in: ['DENIED', 'REJECTED'] } } },
+        };
+      case 'CANCELLED':
+        return {
+          status: 'CANCELLED',
+          OR: [
+            { approval: { is: null } },
+            { approval: { is: { status: { notIn: ['DENIED', 'REJECTED', 'EXPIRED'] } } } },
+          ],
+        };
+      case 'PENDING':
+        return {
+          status: { in: ['PREPARED', 'AWAITING_APPROVAL', 'APPROVED', 'QUEUED', 'EXECUTING'] },
+        };
+    }
+  };
+
+  app.get(
+    '/plans',
+    { preHandler: requireUser, schema: { querystring: PlanListQuerySchema } },
+    async (request): Promise<PlanListResponse> => {
+      const userId = authOf(request).user.id;
+      const q = request.query;
+      const cursor = q.cursor
+        ? await prisma.actionPlan.findFirst({
+            where: { id: q.cursor, userId },
+            select: { id: true, createdAt: true },
+          })
+        : null;
+      if (q.cursor && !cursor) throw new AppError('BAD_REQUEST', 400, 'Cursor is invalid.');
+      const and: Prisma.ActionPlanWhereInput[] = [{ userId }];
+      if (q.outcome) and.push(outcomeWhere(q.outcome));
+      if (q.type) and.push({ intent: { path: ['type'], equals: q.type } });
+      if (q.from || q.to)
+        and.push({
+          createdAt: {
+            ...(q.from ? { gte: new Date(q.from) } : {}),
+            ...(q.to ? { lt: new Date(q.to) } : {}),
+          },
+        });
+      if (cursor)
+        and.push({
+          OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+          ],
+        });
+      const rows = await prisma.actionPlan.findMany({
+        where: { AND: and },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: q.limit + 1,
+        include: {
+          approval: true,
+          executions: { orderBy: { stepIndex: 'asc' } },
+          decisionLog: true,
+          agentRequest: { select: { input: true, traceId: true } },
+        },
+      });
+      const page = rows.slice(0, q.limit);
+      return {
+        plans: page.map((p) =>
+          planListItem(p, {
+            chainId: env.EXECUTION_CHAIN_ID,
+            explorerBase: env.ZG_STORAGE_EXPLORER_URL,
+          }),
+        ),
+        nextCursor: rows.length > q.limit ? (page[page.length - 1]?.id ?? null) : null,
+      };
+    },
+  );
 
   app.get(
     '/plans/:id',
@@ -105,6 +203,7 @@ export const planRoutes: FastifyPluginAsyncZod = async (app) => {
         data: { actionPlanId: plan.id },
       });
       await d.jobs.enqueueDecisionLog(plan.id);
+      await planSettled({ prisma, notifications: d.notifications }, plan.id, 'cancelled');
       return { id: plan.id, status: 'CANCELLED' as const };
     },
   );
@@ -154,6 +253,7 @@ export const planRoutes: FastifyPluginAsyncZod = async (app) => {
             balances: d.balances,
             chainId: env.EXECUTION_CHAIN_ID,
             allowlist: env.TOKEN_ALLOWLIST_JSON,
+            mcp: d.mcp,
           },
           user,
           wallet,

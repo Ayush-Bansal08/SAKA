@@ -12,12 +12,14 @@ import {
 } from './policy.js';
 import {
   DecisionLogRefSchema,
+  InferenceRefSchema,
   PlanStatusSchema,
   PreviewStepSchema,
   QuoteSummarySchema,
+  ScoreItemSchema,
 } from './cards.js';
 import { ActionIntentSchema } from './intent.js';
-import { ZgProvenanceSchema } from './trace.js';
+import { TraceEventSchema, ZgProvenanceSchema } from './trace.js';
 
 export const PROVIDER_KINDS = ['dev', 'world'] as const;
 export const ProviderKindSchema = z.enum(PROVIDER_KINDS);
@@ -124,11 +126,7 @@ export type AgentMessagesResponse = z.infer<typeof AgentMessagesResponseSchema>;
 
 // --- Plans, approvals, decision logs (PHASE 05) ---------------------------------
 
-export const TradeScoreBreakdownItemSchema = z.object({
-  rule: z.string().min(1),
-  penalty: z.number(),
-  evidence: z.string(),
-});
+export const TradeScoreBreakdownItemSchema = ScoreItemSchema;
 export type TradeScoreBreakdownItem = z.infer<typeof TradeScoreBreakdownItemSchema>;
 
 export const SimulationStepViewSchema = z.object({
@@ -216,10 +214,99 @@ export const PlanViewSchema = z.object({
   approval: ApprovalViewSchema.nullable(),
   executions: z.array(ExecutionViewSchema),
   decisionLog: DecisionLogRefSchema.nullable(),
+  /** The run this plan belongs to (trace events: GET /traces/:traceId/events). */
+  traceId: z.string(),
+  /** What the human typed (or the Mode B event), for the drawer header. */
+  requestText: z.string().nullable(),
+  /** Unsigned transactions as previewed: target and 4-byte selector (no full calldata). */
+  calls: z.array(
+    z.object({
+      kind: z.string(),
+      description: z.string(),
+      to: z.string(),
+      selector: z.string().nullable(),
+      valueWei: z.string(),
+    }),
+  ),
+  /** Every 0G inference of the run. */
+  inferences: z.array(InferenceRefSchema),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
 });
 export type PlanView = z.infer<typeof PlanViewSchema>;
+
+/** Activity page outcome of a plan (PHASE 06 §4). */
+export const PLAN_OUTCOMES = [
+  'EXECUTED',
+  'REFUSED',
+  'DENIED',
+  'EXPIRED',
+  'FAILED',
+  'CANCELLED',
+  'PENDING',
+] as const;
+export const PlanOutcomeSchema = z.enum(PLAN_OUTCOMES);
+export type PlanOutcome = z.infer<typeof PlanOutcomeSchema>;
+
+export const PlanListItemSchema = z.object({
+  id: z.string().min(1),
+  createdAt: IsoDateTimeSchema,
+  traceId: z.string(),
+  requestText: z.string().nullable(),
+  type: z.string(),
+  summary: z.string(),
+  amountUsd: DecimalStringSchema,
+  status: PlanStatusSchema,
+  outcome: PlanOutcomeSchema,
+  policyOutcome: PolicyOutcomeSchema,
+  /** Who let it run: the agent alone, a verified human, or nobody (not executed). */
+  approvedBy: z.enum(['AGENT', 'HUMAN']).nullable(),
+  tradeScore: z.number().int().nullable(),
+  tx: z.object({ hash: z.string(), explorerUrl: z.string().url() }).nullable(),
+  decisionLog: DecisionLogRefSchema.nullable(),
+});
+export type PlanListItem = z.infer<typeof PlanListItemSchema>;
+
+export const PlanListQuerySchema = z.object({
+  outcome: PlanOutcomeSchema.optional(),
+  type: z.string().max(40).optional(),
+  from: IsoDateTimeSchema.optional(),
+  to: IsoDateTimeSchema.optional(),
+  cursor: z.string().max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type PlanListQuery = z.infer<typeof PlanListQuerySchema>;
+
+export const PlanListResponseSchema = z.object({
+  plans: z.array(PlanListItemSchema),
+  nextCursor: z.string().nullable(),
+});
+export type PlanListResponse = z.infer<typeof PlanListResponseSchema>;
+
+export const TraceEventsResponseSchema = z.object({
+  traceId: z.string(),
+  events: z.array(TraceEventSchema),
+});
+export type TraceEventsResponse = z.infer<typeof TraceEventsResponseSchema>;
+
+export const PendingApprovalSchema = z.object({
+  id: z.string().min(1),
+  actionPlanId: z.string().min(1),
+  summary: z.string(),
+  reason: z.string(),
+  amountUsd: DecimalStringSchema,
+  expiresAt: IsoDateTimeSchema,
+  providerKind: ProviderKindSchema,
+  channel: z.enum(['WEB', 'TELEGRAM']),
+  createdAt: IsoDateTimeSchema,
+});
+export type PendingApproval = z.infer<typeof PendingApprovalSchema>;
+
+export const PendingApprovalsResponseSchema = z.object({
+  approvals: z.array(PendingApprovalSchema),
+  devApproveAvailable: z.boolean(),
+});
+export type PendingApprovalsResponse = z.infer<typeof PendingApprovalsResponseSchema>;
 
 export const DecisionLogViewSchema = z.object({
   actionPlanId: z.string().min(1),

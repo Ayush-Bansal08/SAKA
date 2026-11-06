@@ -20,6 +20,7 @@ export const portfolioRoutes: FastifyPluginAsyncZod = async (app) => {
           balances,
           chainId: env.EXECUTION_CHAIN_ID,
           allowlist: env.TOKEN_ALLOWLIST_JSON,
+          mcp: app.deps.mcp,
         },
         user,
         wallet,

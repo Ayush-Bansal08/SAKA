@@ -38,9 +38,11 @@ export function describeIntent(intent: ActionIntent): string {
     case 'transfer':
       return `send ${intent.amount} ${tok(intent.token)} to ${short(intent.recipient)}`;
     case 'lp_open':
-      return `provide ${intent.amountUsd ? `$${intent.amountUsd}` : 'liquidity'} to ${tok(intent.token0)}/${tok(intent.token1)} (${intent.rangePreset} range)`;
+      return `provide ${intent.amountUsd ? `$${intent.amountUsd}` : 'liquidity'} to ${tok(intent.token0)}/${tok(intent.token1)}${intent.rangePreset ? ` (${intent.rangePreset} range)` : ''}`;
     case 'lp_rebalance':
-      return `rebalance position ${intent.positionId} (${intent.rangePreset} range)`;
+      return intent.targetPool
+        ? `move position ${intent.positionId} to a better pool`
+        : `rebalance position ${intent.positionId}${intent.rangePreset ? ` (${intent.rangePreset} range)` : ''}`;
     case 'lp_exit':
       return `exit ${intent.percent}% of position ${intent.positionId}`;
     case 'create_trigger':
@@ -49,5 +51,40 @@ export function describeIntent(intent: ActionIntent): string {
       return `cancel trigger ${intent.triggerId}`;
     case 'info':
       return `answer a ${intent.topic.replace('_', ' ')} question`;
+  }
+}
+
+const half = (v: string) => {
+  const [whole = '0', frac = ''] = v.split('.');
+  // Exact decimal halving without floats: scale to an integer, halve, scale back.
+  const digits = frac.length + 1;
+  const n = BigInt(`${whole}${frac}0`) / 2n;
+  const s = n.toString().padStart(digits + 1, '0');
+  const out = `${s.slice(0, -digits)}.${s.slice(-digits)}`.replace(/\.?0+$/, '');
+  return out === '' ? '0' : out;
+};
+
+/**
+ * The request a human would type for `intent`, optionally at half the size: the corrected
+ * request offered on a refusal card (PHASE 06 §2 RefusalCard suggestion chip). Null for intents
+ * that are not one-line requests (triggers, LP management).
+ */
+export function requestFor(intent: ActionIntent, opts: { halve?: boolean } = {}): string | null {
+  const h = (v: string) => (opts.halve ? half(v) : v);
+  switch (intent.type) {
+    case 'swap_exact_in':
+      return intent.amountUsd
+        ? `Swap $${h(intent.amountUsd)} ${tok(intent.tokenIn)} to ${tok(intent.tokenOut)}`
+        : `Swap ${h(intent.amountIn)} ${tok(intent.tokenIn)} to ${tok(intent.tokenOut)}`;
+    case 'swap_exact_out':
+      return `Get exactly ${h(intent.amountOut)} ${tok(intent.tokenOut)} with ${tok(intent.tokenIn)}`;
+    case 'transfer':
+      return `Send ${h(intent.amount)} ${tok(intent.token)} to ${intent.recipient}`;
+    case 'lp_open':
+      return intent.amountUsd
+        ? `Put $${h(intent.amountUsd)} into ${tok(intent.token0)}/${tok(intent.token1)}`
+        : null;
+    default:
+      return null;
   }
 }

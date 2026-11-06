@@ -91,6 +91,16 @@ export class PriceService {
   async drawdownPct(referenceSymbol: string, current: Decimal): Promise<Decimal | null> {
     const symbol = normalise(referenceSymbol);
     if (symbol === 'USDC') return new Decimal(0);
+    const high = await this.high7d(symbol);
+    if (!high) return null;
+    // The live quote can be above the last recorded daily high.
+    const peak = Decimal.max(high, current);
+    return peak.minus(current).div(peak).times(100);
+  }
+
+  /** 7-day high in USD (10 min cache), or null when price history is unavailable. */
+  async high7d(referenceSymbol: string): Promise<Decimal | null> {
+    const symbol = normalise(referenceSymbol);
     const key = `ref-high7d:v1:${symbol}`;
     let high = await this.readCache(key);
     if (!high || this.now() - high.fetchedAt.getTime() >= HIGH_TTL_MS) {
@@ -99,10 +109,18 @@ export class PriceService {
         return high ?? null;
       });
     }
-    if (!high || high.priceUsd.lte(0)) return null;
-    // The live quote can be above the last recorded daily high.
-    const peak = Decimal.max(high.priceUsd, current);
-    return peak.minus(current).div(peak).times(100);
+    return high && high.priceUsd.gt(0) ? high.priceUsd : null;
+  }
+
+  /** Mainnet percent change over the last hour, or null when history is unavailable. */
+  async change1hPct(referenceSymbol: string): Promise<{ openUsd: Decimal } | null> {
+    const mcp = requireMcp(this.mcp);
+    const history = await mcp.callTool(
+      'get_price_history',
+      { symbol: normalise(referenceSymbol), window: '1h', interval: 'hour' },
+      SYSTEM_CTX,
+    );
+    return history.open ? { openUsd: new Decimal(history.open) } : null;
   }
 
   private async fetchQuote(symbol: string, key: string): Promise<PriceQuote> {

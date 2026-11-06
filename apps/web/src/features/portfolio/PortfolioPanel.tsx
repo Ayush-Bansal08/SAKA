@@ -10,7 +10,7 @@ import {
   type RiskMeter,
   type UserView,
 } from '@warden/shared';
-import { Droplets, Info, Layers, RotateCw, Wallet } from 'lucide-react';
+import { Droplets, Info, RotateCw, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SimpleTooltip } from '@/components/ui/tooltip';
@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNow } from '@/hooks/useNow';
 import { usePortfolio } from './hooks';
+import { LiquiditySection } from './Liquidity';
 import { PROFILE_COPY } from './profile-copy';
 
 export function PortfolioPanel({ user }: { user: UserView }) {
@@ -68,7 +69,7 @@ export function PortfolioPanel({ user }: { user: UserView }) {
           )}
           <Totals data={data} />
           <Tokens data={data} />
-          <LpPositions />
+          <LiquiditySection positions={data.lpPositions} />
           <RiskMeterView risk={data.risk} />
           <LimitsBar data={data} profileLabel={PROFILE_COPY[user.riskProfile].label} />
           <PriceSource data={data} />
@@ -233,23 +234,6 @@ function TokenRow({ token: t }: { token: PortfolioTokenView }) {
         )}
       </div>
     </li>
-  );
-}
-
-function LpPositions() {
-  return (
-    <section
-      aria-labelledby="lp-title"
-      className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/40 px-3.5 py-3"
-    >
-      <Layers className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
-      <div className="min-w-0">
-        <h3 id="lp-title" className="text-xs font-medium">
-          Liquidity positions
-        </h3>
-        <p className="text-xs text-muted-foreground">No positions yet</p>
-      </div>
-    </section>
   );
 }
 

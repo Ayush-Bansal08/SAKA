@@ -174,7 +174,8 @@ export const LpOpenIntentSchema = z
     amount0: DecimalStringSchema.optional(),
     amount1: DecimalStringSchema.optional(),
     poolRef: PoolRefSchema.optional(),
-    rangePreset: RangePresetSchema.default('balanced'),
+    /** Omitted unless the user named a range: the preparer uses the risk profile's preset. */
+    rangePreset: RangePresetSchema.optional(),
     reason,
   })
   .refine((i) => i.amountUsd !== undefined || i.amount0 !== undefined || i.amount1 !== undefined, {
@@ -185,7 +186,15 @@ export const LpRebalanceIntentSchema = z.object({
   type: z.literal('lp_rebalance'),
   /** Our LpPosition.id. */
   positionId: z.string().min(1),
-  rangePreset: RangePresetSchema,
+  /** Omitted → the risk profile's preset. */
+  rangePreset: RangePresetSchema.optional(),
+  /** Move to this pool instead of re-ranging in place (Mode B "better pool"). */
+  targetPool: z
+    .object({
+      poolId: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+      hookAddress: AddressSchema.optional(),
+    })
+    .optional(),
   amountUsd,
   reason,
 });

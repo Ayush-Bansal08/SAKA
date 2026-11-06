@@ -73,7 +73,7 @@ export function ApprovalPage() {
                     disabled={action.isPending}
                     onClick={() => action.mutate({ kind: 'dev-approve', approvalId: a.id })}
                   >
-                    <Fingerprint aria-hidden /> Approve (DEV)
+                    <Fingerprint aria-hidden /> Approve (dev)
                   </Button>
                 )}
                 <Button
@@ -81,12 +81,17 @@ export function ApprovalPage() {
                   disabled={action.isPending}
                   onClick={() => action.mutate({ kind: 'deny', approvalId: a.id })}
                 >
-                  Deny
+                  Reject
                 </Button>
               </div>
             ) : (
               <p className="text-muted-foreground">
-                This approval is closed.{' '}
+                {a.status === 'DENIED' ||
+                a.status === 'REJECTED' ||
+                a.status === 'EXPIRED' ||
+                left === 0
+                  ? 'Nothing was traded. '
+                  : 'This approval is closed. '}
                 <Link to="/" className="text-primary underline-offset-4 hover:underline">
                   Back to your agent
                 </Link>
@@ -94,7 +99,7 @@ export function ApprovalPage() {
             )}
             {a.providerKind === 'dev' && (
               <p className="text-[12px] text-caution">
-                DEV approval — World ID step-up arrives in Phase 10.
+                Approve (dev) — World ID step-up replaces this in Phase 10.
               </p>
             )}
           </div>

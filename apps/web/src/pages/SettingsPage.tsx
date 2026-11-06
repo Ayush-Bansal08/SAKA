@@ -8,7 +8,6 @@ import {
 } from '@warden/shared';
 import {
   ArrowUpRight,
-  Bell,
   Fingerprint,
   Gauge,
   ShieldCheck,
@@ -26,6 +25,8 @@ import { useSettings } from '@/features/portfolio/hooks';
 import { PROFILE_COPY } from '@/features/portfolio/profile-copy';
 import { formatFullTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { AlertSettings } from '@/features/inbox/AlertSettings';
+import { RulesPanel } from '@/features/triggers/RulesPanel';
 import { PageContainer, PageHeader } from './PageHeader';
 
 const STEP_UP_TOOLTIP = 'Needs World ID (coming in Phase 10)';
@@ -57,7 +58,7 @@ export function SettingsPage() {
                 </span>
               </Row>
               <Row label="Verified">{user.verifiedAt ? formatFullTime(user.verifiedAt) : '—'}</Row>
-              <Row label="Time zone">{user.timezone}</Row>
+              <Row label="Time zone">{settings.data?.timezone ?? user.timezone}</Row>
             </dl>
           </Panel>
 
@@ -175,14 +176,8 @@ export function SettingsPage() {
             )}
           </Panel>
 
-          <Panel title="Alerts" icon={<Bell />}>
-            <EmptyState
-              className="py-6"
-              icon={<Bell />}
-              title={user.telegramLinked ? 'Telegram connected' : 'Telegram not connected'}
-              description="Your agent sends proactive alerts, approval requests and a morning brief to Telegram."
-            />
-          </Panel>
+          <RulesPanel collapsible={false} showClosed />
+          <AlertSettings />
         </div>
       </div>
     </PageContainer>

@@ -42,6 +42,10 @@ export const REDACT_PATHS = [
   'err.config.headers',
   'env.DATABASE_URL',
   'env.REDIS_URL',
+  'env.TELEGRAM_BOT_TOKEN',
+  'env.TELEGRAM_WEBHOOK_SECRET',
+  '*.botToken',
+  '*.linkCode',
 ];
 
 export function loggerOptions(

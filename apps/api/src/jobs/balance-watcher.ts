@@ -29,6 +29,7 @@ import type {
   PriceService,
 } from '../modules/portfolio/market.js';
 import { advanceStep } from '../modules/users/onboarding.js';
+import type { Notifications } from '../modules/telegram/notifications.js';
 import { executionTokens, findToken } from '../modules/wallet/tokens.js';
 
 export const OWN_EXECUTION_WINDOW_MS = 2 * 60_000;
@@ -54,6 +55,8 @@ export interface BalanceWatcherDeps {
   allowlist: readonly AllowlistEntry[];
   inactivePollMs: number;
   log: { info(obj: object, msg: string): void; warn(obj: object, msg: string): void };
+  /** Telegram notice for the first deposit (PHASE 08). */
+  notifications?: Pick<Notifications, 'enqueue'>;
   now?: () => number;
 }
 
@@ -236,6 +239,13 @@ export async function checkUser(
           onboardingDone: isFunding,
         },
       });
+      if (isFunding)
+        await deps.notifications?.enqueue({
+          kind: 'text',
+          userId,
+          title: '💰 First deposit received',
+          body: `${d.amount} ${d.symbol}${value} reached your agent wallet. Your agent is ready.`,
+        });
     }
     deps.log.info({ userId, deposits: deposits.length, funded }, 'deposit detected');
     return { userId, status: 'deposit', deposits, funded };

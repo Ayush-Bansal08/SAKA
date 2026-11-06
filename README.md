@@ -79,7 +79,7 @@ API tests use the separate `warden_test` database and Redis DB 1. Override them 
 ## Repository layout
 
 ```
-apps/api                    Fastify API + BullMQ worker (+ Telegram bot in P08)
+apps/api                    Fastify API + BullMQ worker + Telegram bot
 apps/web                    React 19 + Vite 6 + Tailwind 4 web app (Vercel)
 packages/shared             Zod schemas and types shared by api, web and mcp
 packages/uniswap-agent-mcp  Uniswap agent MCP server (P02, standalone; see its README)
@@ -176,3 +176,52 @@ Every money-moving intent goes through one deterministic pipeline
 Routes: `GET /plans/:id`, `POST /plans/:id/cancel`, `POST /plans/:id/repreview`,
 `GET /approvals/:id`, `POST /approvals/:id/deny`, `POST /approvals/:id/dev-approve` (dev only),
 `GET /decision-logs/:planId`. Web: cards in the Agent panel and `/approvals/:id`.
+
+## Phase 06 cockpit
+
+The cockpit is the product: chat with your agent, watch it think on 0G, check itself and act.
+Every card shows its proof — trade score with breakdown, simulation, the 0G guard verdict with
+its request ID, tx links and the 0G Storage root hash — and **Details** opens the full story
+of the action. `/activity` lists everything the agent did and refused (CSV export); `/inbox`
+holds pending approvals. Screenshots: [`docs/screenshots/`](docs/screenshots/).
+
+```powershell
+pnpm --filter @warden/web test       # card component tests (Vitest + Testing Library)
+pnpm --filter @warden/web test:e2e   # Playwright smoke against a stateful mock API
+```
+
+## Phase 07 hooks, liquidity, rules
+
+- **`/hooks`: Uniswap v4 hooks, explained.** Real mainnet hooks (and testnet hooks you can trade
+  through), each with a deterministic 0–100 score from the v4 Security Framework, permissions in
+  plain words ("Can change your swap amount"), change history and a 0G-written explanation with
+  its request ID.
+- **Liquidity**: "Put $10 into ETH/USDC" picks the pool and a range that fits your risk profile;
+  positions show a live range bar, value, fees and P&L, with Rebalance and Exit.
+- **Rules**: take-profit, stop-loss, DCA and chained rules. Each fire goes through every safety
+  check again; over-limit actions ask you first.
+
+Demo control (admin only; it changes only _when_ rules fire, never trade amounts):
+
+```powershell
+curl -X POST http://localhost:3001/admin/price-override -H "x-admin-token: $env:ADMIN_TOKEN" `
+  -H "content-type: application/json" -d '{"symbol":"ETH","priceUsd":"2300","ttlSec":180}'
+```
+
+## Phase 08 Mode B, inbox, Telegram
+
+The agent now comes to you. Every 60 s the worker checks each funded wallet with nine detectors
+(`apps/api/src/modules/modeb/detectors`): dip, profit, idle USDC, better pool, out of range, new
+hook, hook changed, big move and the 08:00 morning brief. Anything that moves money runs through the
+same pipeline as a chat request. Safe actions under your limits run alone with a receipt; the rest
+wait in the inbox and on Telegram with Yes / Change / No, and "Yes" re-quotes before anything runs.
+
+- **Telegram:** set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`, then Settings → Connect
+  Telegram. `pnpm dev` long-polls; production uses `API_URL/telegram/webhook` with
+  `TELEGRAM_WEBHOOK_SECRET`. The bot only sends alerts: free text gets one fixed line.
+- **Demo:** `POST /admin/simulate-event` with `{ userId, detector, overrides? }` and
+  `POST /admin/run-brief` with `{ userId }`, both with the `x-admin-token` header.
+- **Sepolia:** set `UNISWAP_BLOCKED_POOLS` (see `.env.example`) so each trade takes the cleanest
+  route.
+- **Price drops buy:** `BIG_MOVE` down and `DIP` buy your dip amount, once a day between them, under
+  your limits and the "Dip buys" switch. The inbox then reports what was bought or sold, and why.

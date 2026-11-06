@@ -13,6 +13,7 @@ import {
   type ActionIntent,
   type ApprovalCard,
   type Card,
+  type CardChecks,
   type HookBand,
   type PolicyOutcome,
   type PolicyReason,
@@ -38,6 +39,8 @@ import { gateHook, isHookAddress } from '../safety/hookGate.js';
 import { simulateSteps } from '../safety/simulate.js';
 import { tradeScore, type TokenCheckFact } from '../safety/tradeScore.js';
 import type { TraceBus } from '../trace/trace-bus.js';
+import { cancelTrigger, createTrigger } from '../triggers/service.js';
+import { requestFor } from './describe.js';
 import { prepare, PrepareError, type PreparedAction, type StoredSteps } from './preparer.js';
 
 export interface PipelineDeps {
@@ -62,6 +65,8 @@ export interface PipelineInput {
   origin: 'user' | 'proactive';
   channel: 'WEB' | 'TELEGRAM';
   portfolioUsd: Decimal | null;
+  /** Mode B: false keeps a clean action waiting for the human's yes (auto-act off). */
+  autoAllowed?: boolean;
   /** Planner provenance, shown on the card. */
   zg?: ZgProvenance;
 }
@@ -109,6 +114,24 @@ export function previewSteps(stored: StoredSteps): PreviewStep[] {
   if (stored.next)
     steps.push({ label: 'Open the new position with the withdrawn tokens', kind: 'lp_create' });
   return steps;
+}
+
+/**
+ * A corrected request for the refusal card's suggestion chip: half the size when the trade was
+ * too big for the pool or too risky, the same request when a check was unavailable (retry).
+ */
+export function suggestedRequest(
+  intent: ActionIntent,
+  reasons: readonly PolicyReason[],
+): string | null {
+  const codes = new Set(reasons.map((r) => r.code));
+  if (codes.has('UNSUPPORTED_TOKEN') || codes.has('DANGER_HOOK') || codes.has('BUILD_FAILED'))
+    return null;
+  if (codes.has('PRICE_IMPACT_TOO_HIGH') || codes.has('TRADE_SCORE_TOO_LOW'))
+    return requestFor(intent, { halve: true });
+  if (codes.has('GUARD_UNAVAILABLE') || codes.has('SIMULATION_UNAVAILABLE'))
+    return requestFor(intent);
+  return null;
 }
 
 /** What to try instead, by the first refusal reason. */
@@ -173,6 +196,81 @@ async function checkTokens(
   );
 }
 
+/**
+ * Rules (PHASE 07 §4): `create_trigger` stores the canonical spec ACTIVE (no money moves, no
+ * step-up); `cancel_trigger` closes it. Every later fire runs through this pipeline again.
+ */
+async function triggerReply(
+  deps: PipelineDeps,
+  input: PipelineInput,
+  prepared: Extract<Awaited<ReturnType<typeof prepare>>, { kind: 'trigger' }>,
+  emit: (
+    e: Omit<Parameters<PipelineDeps['traceBus']['emit']>[0], 'traceId' | 'userId'>,
+  ) => Promise<unknown>,
+  now: Date,
+): Promise<PipelineResult> {
+  const zg = input.zg ? { zg: input.zg } : {};
+  const reply = (text: string, card: Card): PipelineResult => ({
+    text,
+    cards: [card],
+    planId: null,
+    outcome: null,
+    afterReply: noop,
+  });
+  if (prepared.intent.type === 'cancel_trigger') {
+    const ok = await cancelTrigger(deps.prisma, input.user.id, prepared.intent.triggerId);
+    const body = ok
+      ? 'Rule cancelled. It will not fire.'
+      : 'That rule was not found or is already closed.';
+    await emit({ kind: 'plan', title: ok ? 'Rule cancelled' : 'Rule not found', detail: body });
+    return reply(body, {
+      type: 'info',
+      title: ok ? 'Rule cancelled' : 'Rule not found',
+      body,
+      ...zg,
+    });
+  }
+  if (prepared.error || !prepared.plan) {
+    const body = `I understood the rule but could not set it up: ${prepared.error ?? 'unknown error'}`;
+    await emit({ kind: 'error', title: 'Rule not set', detail: body });
+    return reply(body, { type: 'info', title: 'Rule not set', body, ...zg });
+  }
+  const trigger = await createTrigger(deps.prisma, {
+    userId: input.user.id,
+    timezone: input.user.timezone,
+    rule: prepared.intent.rule,
+    plan: prepared.plan,
+    now,
+  });
+  const c = prepared.plan.spec.condition;
+  await emit({
+    kind: 'plan',
+    title: 'Rule set',
+    detail: prepared.plan.humanSummary,
+    data: { triggerId: trigger.id, spec: prepared.plan.spec },
+  });
+  const body =
+    c.type === 'schedule'
+      ? `Next run ${trigger.nextRunAt?.toISOString() ?? 'soon'}. Each run goes through every safety check; anything over your limits asks you first.`
+      : 'I check the price every 30 seconds. When it hits, the action goes through every safety check; anything over your limits asks you first.';
+  return reply(`Rule set: ${prepared.plan.humanSummary}.`, {
+    type: 'info',
+    title: `Rule set: ${prepared.plan.humanSummary}`.slice(0, 200),
+    body,
+    data: {
+      kind: 'trigger',
+      triggerId: trigger.id,
+      triggerKind: trigger.kind,
+      summary: prepared.plan.humanSummary,
+      symbol: c.symbol,
+      targetPriceUsd: c.targetPriceUsd,
+      nextRunAt: trigger.nextRunAt?.toISOString() ?? null,
+      warnings: prepared.plan.warnings,
+    },
+    ...zg,
+  });
+}
+
 export async function runPipeline(
   deps: PipelineDeps,
   input: PipelineInput,
@@ -201,7 +299,12 @@ export async function runPipeline(
         allowlist: deps.env.TOKEN_ALLOWLIST_JSON,
       },
       ctx,
-      { userId: user.id, wallet: getAddress(wallet.address), maxSlippagePct },
+      {
+        userId: user.id,
+        wallet: getAddress(wallet.address),
+        maxSlippagePct,
+        riskProfile: user.riskProfile,
+      },
       intent,
     );
   } catch (err) {
@@ -225,32 +328,7 @@ export async function runPipeline(
     };
   }
 
-  if (prepared.kind === 'trigger') {
-    const body = prepared.error
-      ? `I understood the rule but could not check it: ${prepared.error}`
-      : `${prepared.summary}${prepared.plan?.warnings.length ? ` (${prepared.plan.warnings.join('; ')})` : ''}`;
-    await emit({
-      kind: 'plan',
-      title: 'Trigger planned',
-      detail: body,
-      data: { spec: prepared.plan?.spec ?? null },
-    });
-    return {
-      text: `Trigger planned: ${body}`,
-      cards: [
-        {
-          type: 'info',
-          title: 'Trigger planned',
-          body,
-          ...(prepared.plan ? { data: { spec: prepared.plan.spec } } : {}),
-          ...(input.zg ? { zg: input.zg } : {}),
-        },
-      ],
-      planId: null,
-      outcome: null,
-      afterReply: noop,
-    };
-  }
+  if (prepared.kind === 'trigger') return triggerReply(deps, input, prepared, emit, now);
 
   const p: PreparedAction = prepared;
   const stored = p.stored;
@@ -290,6 +368,7 @@ export async function runPipeline(
   const tokens = await checkTokens(deps, input, stored.tokenChecks);
   const score = tradeScore({
     priceImpactPct: stored.priceImpactPct,
+    apiPriceImpactPct: stored.apiPriceImpactPct ?? null,
     amountUsd: p.amountUsd,
     portfolioUsd: input.portfolioUsd,
     tokens,
@@ -408,10 +487,43 @@ export async function runPipeline(
     });
   }
 
+  const deferredSteps =
+    (simulation?.steps.filter((x) => x.deferred).length ?? 0) + (stored.signature ? 1 : 0);
+  const checks: CardChecks = {
+    breakdown: score.breakdown,
+    simulation: simulation
+      ? {
+          ok: simulation.ok,
+          ...(simulation.unavailable ? { unavailable: true } : {}),
+          simulated: simulation.steps.filter((x) => !x.deferred).length,
+          deferred: deferredSteps,
+          ...(simulation.error ? { error: simulation.error.slice(0, 300) } : {}),
+        }
+      : null,
+    guard: guardResult
+      ? {
+          verdict: guardResult.verdict,
+          pApprove: Math.min(1, Math.max(0, guardResult.pApprove)),
+          reason: guardResult.reason,
+          unavailable: guardResult.unavailable,
+          ...(guardResult.zg ? { zg: guardResult.zg } : {}),
+        }
+      : !deps.zg
+        ? {
+            verdict: 'block',
+            pApprove: 0,
+            reason: 'The 0G guard is not configured on this server.',
+            unavailable: true,
+          }
+        : null,
+  };
+
   // 5. Policy -------------------------------------------------------------------------
   const isSend = intent.type === 'transfer' || intent.type === 'swap_and_send';
   const decision = decide({
     origin: input.origin,
+    ...(input.autoAllowed !== undefined ? { proactiveAutoAllowed: input.autoAllowed } : {}),
+    leavingHookPool: intent.type === 'lp_exit' && hook !== null,
     buildError: p.buildError?.message ?? null,
     simulation,
     refuseFacts: score.refuse,
@@ -439,21 +551,6 @@ export async function runPipeline(
       minTradeScoreAuto: limitsRow?.minTradeScoreAuto ?? profile.minTradeScoreAuto,
       hookPolicy: limitsRow?.hookPolicy ?? profile.hooksWithoutApproval,
     },
-  });
-  await emit({
-    kind: 'policy',
-    title:
-      decision.outcome === 'AUTO'
-        ? 'Policy: AUTO — your agent may do this alone'
-        : decision.outcome === 'STEP_UP'
-          ? 'Policy: needs your approval'
-          : decision.outcome === 'REFUSE'
-            ? 'Policy: refused'
-            : 'Policy: suggestion — needs your yes',
-    detail:
-      decision.reasons.map((r) => r.message).join(' · ') ||
-      'Within your limits and safety thresholds',
-    data: decision,
   });
 
   // 6. Persist ------------------------------------------------------------------------
@@ -509,6 +606,22 @@ export async function runPipeline(
     return { plan, approval };
   });
 
+  await emit({
+    kind: 'policy',
+    title:
+      decision.outcome === 'AUTO'
+        ? 'Policy: AUTO — your agent may do this alone'
+        : decision.outcome === 'STEP_UP'
+          ? 'Policy: needs your approval'
+          : decision.outcome === 'REFUSE'
+            ? 'Policy: refused'
+            : 'Policy: suggestion — needs your yes',
+    detail:
+      decision.reasons.map((r) => r.message).join(' · ') ||
+      'Within your limits and safety thresholds',
+    data: { ...decision, actionPlanId: plan.id },
+  });
+
   // 7. Card -----------------------------------------------------------------------------
   const steps = previewSteps(stored);
   const base = {
@@ -537,11 +650,17 @@ export async function runPipeline(
       reasons: decision.reasons,
       ...(p.buildError ? {} : { tradeScore: score.score }),
       suggestion: refusalSuggestion(decision.reasons),
+      ...(() => {
+        const r = suggestedRequest(intent, decision.reasons);
+        return r ? { suggestedRequest: r } : {};
+      })(),
+      ...(p.quote ? { quote: p.quote } : {}),
+      checks,
       decisionLog: { status: 'PENDING' },
       ...(input.zg ? { zg: input.zg } : {}),
     };
     return {
-      text: `I did not do this: ${decision.reasons[0]!.message}.`,
+      text: `I did not do this: ${decision.reasons[0]!.message.replace(/[.!?]+$/, '')}.`,
       cards: [card],
       planId: plan.id,
       outcome: 'REFUSE',
@@ -576,6 +695,10 @@ export async function runPipeline(
       channel: approval.channel,
       providerKind: approval.providerKind,
       expiresAt: approval.expiresAt.toISOString(),
+      ...(hook
+        ? { hook: { address: getAddress(hook.address), score: hook.score, band: hook.band } }
+        : {}),
+      checks,
       ...(input.zg ? { zg: input.zg } : {}),
     };
     return {
@@ -603,6 +726,7 @@ export async function runPipeline(
       : {}),
     policyOutcome: decision.outcome,
     policyReasons: decision.reasons,
+    checks,
     ...(input.zg ? { zg: input.zg } : {}),
   };
   return {

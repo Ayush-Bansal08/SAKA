@@ -339,3 +339,89 @@ signatures, calldata or personal data) → `DecisionLog` row (payloadHash) → 0
 upload via the turbo indexer (root checked against the local merkle root) → `zgRootHash`,
 `zgTxHash`, trace "Logged to 0G Storage", card patched. Queue `decisionlog`, 5 attempts,
 exponential backoff; without `ZG_STORAGE_PRIVATE_KEY` records stay PENDING.
+
+## Phase 06 cockpit UI (Mode A)
+
+- **Layout** (`apps/web/src/pages/CockpitPage.tsx`): ≥ 1280 px three columns (Portfolio 320 |
+  Agent | Live activity 380); tablet two columns with live activity in a header slide-over;
+  mobile tabs (Agent / Portfolio / Activity).
+- **Cards carry their own proof** (`packages/shared/src/cards.ts`): preview, approval and
+  refusal cards have `checks` (trade-score breakdown, simulation, 0G guard verdict + request ID).
+  Refusals add `suggestedRequest` (half size when too big, the same request when a check was
+  unavailable). Receipts add the quote, every 0G inference (`inferences`) and `completedAt`.
+- **In-place transitions** (`apps/web/src/features/agent/fold.ts`): the API posts the
+  receipt / failure / price-moved card as a follow-up message; the chat folds it into the
+  preview's position (approval cards keep the record and show the outcome below it).
+- **Fact cards** (`apps/api/src/modules/agent/fact-cards.ts`): info answers get typed cards
+  built from the MCP tool outputs the planner used (`check_token`, `compare_pools`,
+  `score_hook`) plus the portfolio when asked. The numbers never come from model text.
+- **Plan drawer** (`apps/web/src/features/plan/PlanDrawer.tsx`, opens from `?plan=<id>`):
+  timeline (`GET /traces/:traceId/events`), checks, policy reasons, approval record, unsigned
+  calls (target + 4-byte selector), executions, 0G inferences, decision-log payload, raw intent.
+- **Live activity** groups events by `traceId` into runs (status, duration, request text) with
+  filter chips (All / 0G / Uniswap / Safety / Human / Chain). The policy trace event now carries
+  `actionPlanId`, and the SSE replay is 150 events.
+- **New endpoints**: `GET /plans` (activity list: outcome / type / date filters, cursor paging),
+  `GET /traces/:traceId/events` (owner-scoped), `GET /approvals/pending` (nav badge + inbox).
+- **Header**: today's limit mini-bar, SSE status, pending-approval badge on Inbox; toasts for
+  executed / refused / approval-needed when the human is on another page.
+
+## Phase 07 hooks explorer, LP positions, triggers
+
+- **Hook indexer** (`apps/api/src/modules/hooks/indexer.ts`, worker queue `hooks`, every 5 min):
+  `list_new_hooks` (market: mainnet, 30 days; execution: the testnet) → upsert `Hook` +
+  `HookPool` → for new or stale (> 1 h) hooks `score_hook` + `get_hook_state` → `HookSnapshot` on
+  first sight and on every observable change (score, band, code hash, implementation, owner,
+  permissions, pool fees) → 0G explanation, cached by score (a template fallback is retried on a
+  later run). Bounded per run (40 rescores, 8 explanations). New hooks emit `detector` events
+  for Mode B (PHASE 08), never on the very first import.
+- **Hooks API** (`modules/hooks/routes.ts`): `GET /hooks` (scope, band, new this week, search,
+  sort, paging), `GET /hooks/:chainId/:address` (breakdown with framework sections, 14-flag grid,
+  facts, pools, history, explanation + request ID), `GET …/what-if` (`quote_pool` through the hook
+  pool vs `get_quote`; execution chain only).
+- **Triggers** (`modules/triggers`): `create_trigger` → `plan_trigger` → `Trigger` ACTIVE (no
+  money moves, no step-up). The evaluator (queue `triggers`, every 30 s) checks price rules
+  against the reference price and schedules against `nextRunAt` (DST-safe local time). A fire is a
+  new `AgentRequest` (channel TRIGGER) through the full pipeline. One fire per window: Redis key
+  `trigger:fire:${id}:${windowStart}` plus an optimistic row claim. CHAINED runs step N+1 only
+  after step N's plan is EXECUTED; refusal, denial, expiry or failure stops it and tells the human.
+- **Demo price override** (`POST /admin/price-override`, `x-admin-token`): decides only whether a
+  rule fires. Amounts and value at risk always use live prices (`livePrice()`); execution quotes
+  never see it. Header chip "Price override active (demo)".
+- **LP**: the range preset follows the risk profile unless the user names one (careful → wide,
+  balanced → medium, adventurous → narrow). `GET /portfolio` adds live LP positions
+  (`get_lp_positions`), LP value in the total, LP P&L, and the out-of-range / hook-exposure risk
+  factors. The planner sees position ids for rebalance / exit.
+- **Guard transport** `ZG_GUARD_MODE`: `decisions` (Vela, default) or `chat` (the guard model via
+  `/chat/completions` with a strict JSON verdict). Used while 0G's decisions models are down;
+  fail-closed either way.
+
+## Phase 08 Mode B and Telegram
+
+- **Detectors** are pure functions of a `DetectorContext` (`modules/modeb/types.ts`). All reads
+  happen once in `context.ts`; a missing fact means the detector does not fire. Thresholds live in
+  `MODE_B` (`packages/shared/src/suggestions.ts`).
+- **Tick** (`runner.ts`): close expired suggestions, read the market once, then check users with
+  jitter inside `MODEB_TICK_BUDGET_MS`. Users the budget misses go first next tick. Daily cap:
+  `maxProactivePerDay`, not counting RED alerts, the brief or demo events.
+- **Lifecycle** (`suggestions.ts`): the unique `(userId, dedupeKey)` row is the claim, then 0G text,
+  then the pipeline with `origin: 'proactive'`. AUTO → `AUTO_EXECUTED`, ASK → `OPEN`, refused →
+  `INFO` with the reason. Every exit from `OPEN` is a compare-and-set, so web and Telegram can race.
+- **Yes** re-quotes (over 1% closes the plan), then re-runs the policy on the stored facts with the
+  current limits and hook band: AUTO queues the same plan, STEP_UP opens an approval, REFUSE closes
+  it. Prepared plans expire after 15 minutes, and every closed plan is logged to 0G Storage.
+- **Policy additions:** auto-act off keeps a clean action at ASK. Hook pools are never rebalanced or
+  exited alone. `leavingHookPool` means a Danger hook, or the score it drags down, cannot trap a
+  position: the exit steps up instead of being refused.
+- **Drops buy:** BIG_MOVE down buys the dip amount under the DIP switch. `boughtDipToday` allows one
+  dip purchase a day across both rules. After execution `executedReport` rewrites the suggestion
+  into what was done and why.
+- **Routing:** with `UNISWAP_BLOCKED_POOLS` set, `fetchCleanestClassicQuote` quotes V3 and V4
+  separately on the execution chain, drops blocked pools and keeps the cleanest route.
+- **Guard vs policy:** the guard judges safety and is not shown spending limits. Limits are the
+  policy's job, and over them a human decides.
+- **Telegram:** API, worker and bot only enqueue (`notifications.ts`). The worker's `notify` queue
+  sends at concurrency 1, 25 per second, and waits out 429 `retry_after` (`delivery.ts`). Buttons are
+  HMAC-signed and checked against the clicking chat. localhost URLs never become buttons, because
+  Telegram rejects the whole message.
+- **After execution:** `onPlanSettled` and `onResolved` update the suggestion and edit its message.

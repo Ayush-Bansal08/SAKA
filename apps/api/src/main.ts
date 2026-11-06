@@ -12,8 +12,7 @@ switch (processType) {
     await import('./worker.js');
     break;
   case 'bot':
-    console.error('[main] PROCESS_TYPE=bot: the Telegram bot is added in Phase 08.');
-    process.exit(1);
+    await import('./bot.js');
     break;
   default:
     console.error(`[main] Unknown PROCESS_TYPE "${processType}". Use server | worker | bot.`);

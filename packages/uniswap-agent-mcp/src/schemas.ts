@@ -211,7 +211,11 @@ export const BuildSummarySchema = z.object({
   amountOut: AmountSchema.optional(),
   minAmountOut: AmountSchema.optional(),
   maxAmountIn: AmountSchema.optional(),
+  /** Effective impact vs the deepest direct pool's mid (see priceImpactMethod). */
   priceImpactPct: z.number().optional(),
+  /** The Trading API's raw `priceImpact`, kept as evidence. */
+  apiPriceImpactPct: z.number().optional(),
+  priceImpactMethod: z.enum(['effective_vs_main_pool', 'api']).optional(),
   gasEstimateWei: RawAmountSchema.optional(),
   gasFeeUsd: z.string().optional(),
   route: z.string().optional(),
@@ -315,7 +319,24 @@ export const GetQuoteOutputSchema = z.object({
   /** EXACT_OUTPUT: maximum spent after slippage. */
   maxAmountIn: AmountSchema.nullable(),
   slippagePct: z.number().nullable(),
+  /** Effective execution price of the whole quote vs the deepest direct pool's mid (percent). */
   priceImpactPct: z.number().nullable(),
+  priceImpactDetail: z
+    .object({
+      method: z.enum(['effective_vs_main_pool', 'api']),
+      /** The Trading API's raw `priceImpact` (percent), kept as evidence. */
+      apiPct: z.number().nullable(),
+      referencePool: z.string().nullable(),
+      /** Single-protocol re-quote when the effective price was > 1% worse than mid. */
+      requote: z
+        .object({
+          protocol: z.enum(['V2', 'V3', 'V4']),
+          kept: z.enum(['original', 'single_protocol']),
+        })
+        .nullable(),
+    })
+    // Optional so an API talking to an older MCP deployment still validates its quotes.
+    .optional(),
   gasFee: z.object({ wei: RawAmountSchema.nullable(), usd: z.string().nullable() }),
   gasUseEstimate: z.string().nullable(),
   route: z.object({

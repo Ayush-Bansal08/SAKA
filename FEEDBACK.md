@@ -132,6 +132,25 @@ appended to in every phase with concrete friction we hit, with the time and the 
   ETH swap the first time it ran end to end. → We now accept both and normalise to decimal
   (`packages/uniswap-agent-mcp/src/tx.ts`, `weiString`). Documenting the format in the OpenAPI
   `TransactionRequest` schema (or using one format across both APIs) would save integrators a bug.
-- **[PHASE 05, 2026-11-06, live] Sepolia price impact** — a $1 ETH → USDC quote on Sepolia reports
-  95.64% price impact (v4 0.3% pool), so the agent's 5% hard limit refuses every swap there. →
-  Correct behaviour for a safety-first agent; the testnet pool needs liquidity before a live demo.
+- **[PHASE 05, 2026-11-06, live] `priceImpact` is misleading on split routes** — a $2 ETH → USDC
+  quote on Sepolia (0.000894 ETH) reported `priceImpact: 95.89`, so our 5% hard limit refused it.
+  Yet the same request gave the user the BEST output of any routing: 23.695 USDC with V2/V3/V4,
+  against 23.413 USDC at 1.01% with `protocols: ["V4"]` and 23.370 USDC at 1.00% with V3 only. The
+  route split 5% through ETH → UNI → USDC, where the testnet UNI/USDC pool's mid price is absurd
+  (at mid that leg "should" return ~555 USDC; it returns 1.45). The API weighs each leg against
+  its own mid price, so one junk leg makes the whole trade read as a 96% loss. At 0.0022 ETH the
+  same pair reported 1.02%, so which number you get depends on how the router happens to split.
+  Our earlier note blamed missing pool liquidity; that was wrong. → Fix
+  (`packages/uniswap-agent-mcp/src/services/priceImpact.ts`, `services/quote.ts`
+  `fetchBestClassicQuote`):
+  1. Safety metric = the effective execution price of the whole quote (total out / total in, fees
+     included) against the mid price of the deepest direct pool in the route (from
+     `sqrtRatioX96`, or V2 reserves). On the quote above that is −0.19% (better than mid).
+  2. When it is more than 1% worse than that mid, we quote again with `protocols` restricted to the
+     main pool's protocol and keep whichever quote gives the user more.
+  3. A real loss is still refused (> 5% effective). The API's raw `priceImpact` stays in the
+     trade-score breakdown as evidence.
+
+  What would have helped: a per-route or "versus best direct pool" impact in the `/quote`
+  response, a note in the docs that `priceImpact` is computed per leg against each pool's own mid
+  price, or a way to exclude pools whose price disagrees with the route's main pool.

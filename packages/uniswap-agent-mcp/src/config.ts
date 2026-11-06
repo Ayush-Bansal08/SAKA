@@ -47,6 +47,21 @@ export const ConfigSchema = z.object({
   UNISWAP_DECISION_ORIGIN: z.enum(['autonomous', 'human_mediated']).default('autonomous'),
   /** Universal Router version header. 2.0 and 2.1.1 were sunset on 2026-10-21 (supported-chains doc). */
   UNISWAP_UNIVERSAL_ROUTER_VERSION: z.enum(['2.1.2', '2.2.0']).default('2.1.2'),
+  /**
+   * Comma list of pools (v3 address / v4 poolId) never to route through on the execution chain.
+   * Set it to turn on per-trade route selection. Unset keeps the router's own choice.
+   */
+  UNISWAP_BLOCKED_POOLS: z
+    .string()
+    .trim()
+    .transform((v) =>
+      v
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().regex(/^0x[0-9a-f]{40}([0-9a-f]{24})?$/, 'must be a pool id')))
+    .optional(),
   EXECUTION_CHAIN_ID: z.coerce.number().int().positive().default(11155111),
   EXECUTION_RPC_URL: url,
   MAINNET_RPC_URL: url,

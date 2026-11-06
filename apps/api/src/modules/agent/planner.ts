@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
+  Decimal,
   ACTION_INTENT_TYPES,
   ActionIntentSchema,
   InfoCardSchema,
@@ -86,9 +87,15 @@ const ResponseSchema = z.object({
     .min(1),
 });
 
+/** A successful read-tool result the planner saw (the deterministic facts behind an answer). */
+export interface PlannerFact {
+  tool: PlannerReadTool;
+  output: unknown;
+}
+
 export type PlanResult =
   | { kind: 'intent'; intent: ActionIntent; zg: ZgProvenance }
-  | ({ kind: 'answer'; zg: ZgProvenance } & PlannerAnswer);
+  | ({ kind: 'answer'; zg: ZgProvenance; facts: PlannerFact[] } & PlannerAnswer);
 
 export class PlannerError extends Error {
   override name = 'PlannerError';
@@ -231,9 +238,14 @@ function inventedAddresses(intent: ActionIntent, corpus: string): string[] {
  * cannot be trusted, so it fails validation and the model is asked to resend it quoted.
  */
 const DECIMAL_KEYS =
-  /("(?:amount|amountIn|amountOut|amountUsd|amount0|amount1|priceUsd|exactAmount)"\s*:\s*)(\d+(?:\.\d+)?)(?=\s*[,}\]])/g;
+  /("(?:amount|amountIn|amountOut|amountUsd|amount0|amount1|priceUsd|exactAmount)"\s*:\s*)"?(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)"?(?=\s*[,}\]])/g;
 export function quoteDecimalFields(rawArguments: string): string {
-  return rawArguments.replace(DECIMAL_KEYS, '$1"$2"');
+  // Models write tiny amounts as 6.925e-5, quoted or not; amounts must be plain decimals.
+  return rawArguments.replace(
+    DECIMAL_KEYS,
+    (_m, key: string, value: string) =>
+      `${key}"${/e/i.test(value) ? new Decimal(value).toFixed() : value}"`,
+  );
 }
 
 type IntentMember = (typeof ActionIntentSchema.options)[number];
@@ -284,6 +296,7 @@ export async function plan(
   ];
   let readRounds = 0;
   let repaired = false;
+  const facts: PlannerFact[] = [];
   const repair = (why: string) => {
     if (repaired) throw new PlannerError(why);
     repaired = true;
@@ -331,7 +344,7 @@ export async function plan(
           throw new PlannerError('Call propose or answer alone, after any read tools.');
         const args: unknown = JSON.parse(quoteDecimalFields(finalCall.function.arguments));
         if (finalCall.function.name === 'answer')
-          return { kind: 'answer', ...AnswerSchema.parse(args), zg: response.zg };
+          return { kind: 'answer', ...AnswerSchema.parse(args), zg: response.zg, facts };
         const intent = parseIntent(args);
         // Only what the model was given (system/user/tool), never its own output.
         const corpus = JSON.stringify(messages.filter((m) => m.role !== 'assistant')).toLowerCase();
@@ -374,6 +387,7 @@ export async function plan(
           UniswapMcp.TOOL_INPUT_SCHEMAS[name].parse(args) as never,
           ctx,
         );
+        facts.push({ tool: name, output });
       } catch (err) {
         output = errorPayload(err);
       }

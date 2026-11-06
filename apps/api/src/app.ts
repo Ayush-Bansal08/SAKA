@@ -41,8 +41,14 @@ import {
 } from './modules/approvals/dev-approval-provider.js';
 import { approvalRoutes } from './modules/approvals/routes.js';
 import { planRoutes } from './modules/agent/plan-routes.js';
+import { hookRoutes } from './modules/hooks/routes.js';
+import { triggerRoutes } from './modules/triggers/routes.js';
 import { createChainClient, type ChainClient } from './modules/execution/chain.js';
 import { createBullJobs, type JobQueues } from './modules/execution/jobs.js';
+import { modeBRoutes } from './modules/modeb/routes.js';
+import { approvalResolved } from './modules/modeb/suggestions.js';
+import { createNotifications, type Notifications } from './modules/telegram/notifications.js';
+import { telegramRoutes } from './modules/telegram/routes.js';
 
 export interface AppDeps {
   env: Env;
@@ -65,6 +71,8 @@ export interface AppDeps {
   chain: ChainClient | null;
   /** Producers for the execute / decisionlog queues (the worker consumes them). */
   jobs: JobQueues;
+  /** Outgoing Telegram work (a no-op without a bot token). */
+  notifications: Notifications;
   approvals: ApprovalsService;
   approvalProvider: DevApprovalProvider;
   log: FastifyBaseLogger;
@@ -79,6 +87,8 @@ export interface BuildAppOverrides {
   jobs?: JobQueues;
   /** Replace the execution-chain client (tests). */
   chain?: ChainClient | null;
+  /** Replace the Telegram queue (tests). */
+  notifications?: Notifications;
 }
 
 declare module 'fastify' {
@@ -135,11 +145,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       ? options.overrides.chain
       : createChainClient(env.EXECUTION_CHAIN_ID, env.EXECUTION_RPC_URL);
   const jobs = options.overrides?.jobs ?? createBullJobs(env.REDIS_URL);
+  const notifications = options.overrides?.notifications ?? createNotifications(env);
   const approvals = new ApprovalsService({
     prisma,
     trace: traceBus,
     jobs,
     ttlSeconds: env.APPROVAL_TTL_SECONDS,
+    onResolved: (approval, outcome) =>
+      approvalResolved({ prisma, notifications }, approval, outcome),
   });
   const approvalProvider = createApprovalProvider(env, approvals, (id) =>
     prisma.approval.findUnique({ where: { id }, select: { expiresAt: true } }),
@@ -161,6 +174,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     zg,
     chain,
     jobs,
+    notifications,
     approvals,
     approvalProvider,
     log,
@@ -207,10 +221,15 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await app.register(agentRoutes);
   await app.register(planRoutes);
   await app.register(approvalRoutes);
+  await app.register(hookRoutes);
+  await app.register(triggerRoutes);
+  await app.register(modeBRoutes);
+  await app.register(telegramRoutes);
 
   app.addHook('onClose', async () => {
     await mcp?.close();
     await jobs.close();
+    await notifications.close();
     await traceBus.close();
     await Promise.allSettled([prisma.$disconnect(), redis.quit()]);
   });

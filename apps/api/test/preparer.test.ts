@@ -137,6 +137,25 @@ describe('preparer: intent → MCP build tools (deterministic)', () => {
         range: { preset: 'narrow' },
       });
 
+      // Live regression: a planner-chosen pool with only a USD amount (no token amounts) must
+      // still resolve and price the tokens (it used to fail with "Could not price…").
+      r = await s.run({
+        type: 'lp_open',
+        token0: { symbol: 'USDC' },
+        token1: { symbol: 'ETH' },
+        amountUsd: '10',
+        poolRef: { poolId: POOL_ID },
+        reason,
+      });
+      expect(r.calls).toEqual(['build_lp_position']);
+      expect(r.args[0]).toMatchObject({
+        // currency order: native ETH (0x0) first; $5 of ETH at $2,500
+        pool: { token0: '0x0000000000000000000000000000000000000000' },
+        independentToken: { token: '0x0000000000000000000000000000000000000000', amount: '0.002' },
+        // no range named → the BALANCED profile's medium preset
+        range: { preset: 'medium' },
+      });
+
       // create_trigger → plan_trigger (no tx); cancel_trigger → nothing
       r = await s.run({
         type: 'create_trigger',

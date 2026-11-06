@@ -12,6 +12,7 @@ import {
 } from './primitives.js';
 import { HookPolicySchema, PolicyReasonCodeSchema, RiskProfileSchema } from './policy.js';
 import { OnboardingStepSchema } from './api.js';
+import { AutoActSettingsSchema, TelegramSettingsSchema } from './suggestions.js';
 
 // ---------------------------------------------------------------------------
 // Wallet, limits, faucets
@@ -148,6 +149,39 @@ export const LimitsUsageSchema = z.object({
 });
 export type LimitsUsage = z.infer<typeof LimitsUsageSchema>;
 
+/** An open Uniswap v4 LP position (PHASE 07): live amounts, range, value, P&L and hook. */
+export const LpPositionViewSchema = z.object({
+  id: z.string(),
+  tokenId: z.string(),
+  poolId: z.string(),
+  token0: z.object({ symbol: z.string(), address: AddressSchema }),
+  token1: z.object({ symbol: z.string(), address: AddressSchema }),
+  amount0: DecimalStringSchema,
+  amount1: DecimalStringSchema,
+  fees0: DecimalStringSchema.nullable(),
+  fees1: DecimalStringSchema.nullable(),
+  tickLower: z.number().int(),
+  tickUpper: z.number().int(),
+  currentTick: z.number().int(),
+  /** token1 per token0 at the range bounds and now. */
+  priceLower: z.string(),
+  priceUpper: z.string(),
+  priceCurrent: z.string(),
+  inRange: z.boolean(),
+  valueUsd: DecimalStringSchema.nullable(),
+  costBasisUsd: DecimalStringSchema,
+  pnlUsd: SignedDecimalStringSchema.nullable(),
+  hook: z
+    .object({
+      address: AddressSchema,
+      score: z.number().int().nullable(),
+      band: z.enum(['SAFE', 'CAUTION', 'DANGER']).nullable(),
+    })
+    .nullable(),
+  openedAt: IsoDateTimeSchema,
+});
+export type LpPositionView = z.infer<typeof LpPositionViewSchema>;
+
 export const PortfolioResponseSchema = z.object({
   chainId: ExecutionChainIdSchema,
   /** Null until the agent wallet exists. */
@@ -155,7 +189,7 @@ export const PortfolioResponseSchema = z.object({
   totalUsd: DecimalStringSchema,
   tokens: z.array(PortfolioTokenViewSchema),
   /** Uniswap LP positions (added in PHASE 07). */
-  lpPositions: z.array(z.unknown()),
+  lpPositions: z.array(LpPositionViewSchema),
   pnl: z.object({
     totalUsd: SignedDecimalStringSchema,
     pct: SignedDecimalStringSchema.nullable(),
@@ -183,6 +217,9 @@ export const SettingsResponseSchema = z.object({
   riskProfile: RiskProfileSchema,
   limits: LimitsViewSchema.nullable(),
   wallet: AgentWalletViewSchema.nullable(),
+  timezone: z.string(),
+  telegram: TelegramSettingsSchema,
+  autoAct: AutoActSettingsSchema,
 });
 export type SettingsResponse = z.infer<typeof SettingsResponseSchema>;
 

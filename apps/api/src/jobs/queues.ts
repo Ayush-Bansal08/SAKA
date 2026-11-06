@@ -6,6 +6,14 @@ export const QUEUES = {
   execute: 'execute',
   /** PHASE 05: decision-log uploads to 0G Storage. */
   decisionLog: 'decisionlog',
+  /** PHASE 07: hook indexer (own queue: slow upstreams never delay other jobs). */
+  hooks: 'hooks',
+  /** PHASE 07: trigger evaluator. */
+  triggers: 'triggers',
+  /** PHASE 08: Mode B detectors. */
+  modeb: 'modeb',
+  /** PHASE 08: outgoing Telegram messages (one place, so one rate limit). */
+  notify: 'notify',
 } as const;
 
 export const JOBS = {
@@ -16,7 +24,16 @@ export const JOBS = {
   approvalSweep: 'approval-sweep',
   execute: 'execute',
   decisionLogUpload: 'decisionlog.upload',
+  hookIndex: 'hooks.index',
+  triggerEvaluate: 'triggers.evaluate',
+  modebTick: 'modeb.tick',
+  notify: 'notify.send',
 } as const;
 
 export const HEARTBEAT_EVERY_MS = 60_000;
 export const APPROVAL_SWEEP_EVERY_MS = 15_000;
+export const HOOK_INDEX_EVERY_MS = 5 * 60_000;
+export const TRIGGER_EVALUATE_EVERY_MS = 30_000;
+export const MODEB_TICK_EVERY_MS = 60_000;
+/** Under Telegram's ~30 messages per second per bot. */
+export const NOTIFY_MAX_PER_SECOND = 25;

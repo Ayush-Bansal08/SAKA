@@ -351,3 +351,28 @@ describe('trade score readability', () => {
     expect(r.refuse[0]!.code).toBe('PRICE_IMPACT_TOO_HIGH');
   });
 });
+
+describe('price impact: effective figure decides, the Uniswap API figure is evidence', () => {
+  it('a junk testnet split (API 95.89%, effective 0%) is not refused; the API figure stays in the breakdown', () => {
+    const r = score({ priceImpactPct: 0, apiPriceImpactPct: 95.89 });
+    expect(r.refuse).toEqual([]);
+    expect(r.score).toBe(100);
+    const impact = r.breakdown.find((b) => b.rule === 'price_impact')!;
+    expect(impact.penalty).toBe(0);
+    expect(impact.evidence).toContain('Uniswap API reported 95.89%');
+  });
+
+  it('a real loss is still refused even when the API figure looks fine', () => {
+    const r = score({ priceImpactPct: 11.21, apiPriceImpactPct: 1.2 });
+    expect(r.refuse).toEqual([
+      expect.objectContaining({ code: 'PRICE_IMPACT_TOO_HIGH', value: 11.21, limit: 5 }),
+    ]);
+    const decision = decide(base({ priceImpactPct: 11.21 }));
+    expect(decision.outcome).toBe('REFUSE');
+  });
+
+  it('no note when both figures agree', () => {
+    const impact = score({ priceImpactPct: 1.01, apiPriceImpactPct: 1.01 }).breakdown[0]!;
+    expect(impact.evidence).not.toContain('Uniswap API');
+  });
+});

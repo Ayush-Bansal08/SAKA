@@ -30,6 +30,8 @@ export interface PlannerContext {
     totalUsd: string;
     tokens: { symbol: string; balance: string; valueUsd: string | null }[];
     riskLabel?: string;
+    /** Open LP positions: `id` is what lp_rebalance / lp_exit take as positionId. */
+    lpPositions?: { id: string; pair: string; inRange: boolean; valueUsd: string | null }[];
   };
   /** USD per whole token (mainnet reference), by symbol. */
   referencePricesUsd: Record<string, string>;
@@ -48,6 +50,12 @@ export function compactPortfolio(portfolio: PortfolioResponse): PlannerContext['
       .slice(0, MAX_TOKENS)
       .map((t) => ({ symbol: t.symbol, balance: t.balance, valueUsd: t.valueUsd })),
     riskLabel: portfolio.risk.label,
+    lpPositions: portfolio.lpPositions.slice(0, 10).map((p) => ({
+      id: p.id,
+      pair: `${p.token0.symbol}/${p.token1.symbol}`,
+      inRange: p.inRange,
+      valueUsd: p.valueUsd,
+    })),
   };
 }
 

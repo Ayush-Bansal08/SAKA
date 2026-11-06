@@ -40,6 +40,7 @@ import {
   type TraceEventInput,
   type TraceKind,
   type ZgProvenance,
+  type QuoteSummary,
   type ReceiptCard,
   type UniswapMcp,
 } from '@warden/shared';
@@ -50,6 +51,7 @@ import { dayBoundsInZone } from '../../lib/time.js';
 import { AppError } from '../../lib/errors.js';
 import { patchPlanCards, postPlanMessage, setPreviewStatus } from '../agent/card-store.js';
 import { describeIntent } from '../agent/describe.js';
+import { inferenceRefs } from '../agent/plan-view.js';
 import type { StoredSteps } from '../agent/preparer.js';
 import type { DevApprovalProvider } from '../approvals/dev-approval-provider.js';
 import { reasonText, type ApprovalsService } from '../approvals/service.js';
@@ -70,6 +72,8 @@ export interface ExecutorDeps {
   jobs: JobQueues;
   approvals: ApprovalsService;
   approvalProvider: Pick<DevApprovalProvider, 'requestApproval' | 'kind'>;
+  /** Called once a run ended (Mode B: receipts, suggestion status). Never fails the job. */
+  onPlanSettled?: (planId: string, outcome: ExecuteOutcome) => Promise<void>;
   now?: () => Date;
 }
 
@@ -145,7 +149,9 @@ export async function executePlan(deps: ExecutorDeps, planId: string): Promise<E
       throw new LockBusyError(`Another action of this user is executing (${holder ?? 'unknown'})`);
   }
   try {
-    return await runLocked(deps, planId);
+    const outcome = await runLocked(deps, planId);
+    await settled(deps, planId, outcome);
+    return outcome;
   } finally {
     await deps.redis.eval(
       "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0",
@@ -154,6 +160,10 @@ export async function executePlan(deps: ExecutorDeps, planId: string): Promise<E
       planId,
     );
   }
+}
+
+async function settled(deps: ExecutorDeps, planId: string, outcome: ExecuteOutcome) {
+  await deps.onPlanSettled?.(planId, outcome).catch(() => undefined);
 }
 
 async function loadPlan(prisma: PrismaClient, planId: string): Promise<PlanRow> {
@@ -400,8 +410,37 @@ async function stepUpAfterLimitChange(
 // 2. Re-quote
 // ---------------------------------------------------------------------------
 
+/**
+ * Mode B "Yes": the suggestion was prepared up to 15 minutes ago, so re-quote it before asking
+ * the human for anything. Moved more than 1% → the plan closes with a "Price moved" card.
+ * Plans without a swap have no quote to compare; execution re-checks them when it rebuilds.
+ */
+export async function requoteBeforeAccept(
+  deps: Pick<ExecutorDeps, 'prisma' | 'mcp' | 'traceBus' | 'jobs'>,
+  planId: string,
+): Promise<{ moved: false } | { moved: true; worsePct: number }> {
+  const plan = await loadPlan(deps.prisma, planId);
+  const traceId = plan.agentRequest.traceId;
+  const emit: Emit = (e) =>
+    deps.traceBus.emit({ ...e, traceId, userId: plan.userId } as TraceEventInput);
+  try {
+    await requote(
+      deps,
+      plan,
+      plan.steps as unknown as StoredSteps,
+      { traceId, userId: plan.userId },
+      emit,
+    );
+    return { moved: false };
+  } catch (err) {
+    if (!(err instanceof PriceMoved)) throw err;
+    await priceMoved(deps, plan, err, emit);
+    return { moved: true, worsePct: err.worsePct };
+  }
+}
+
 async function requote(
-  deps: ExecutorDeps,
+  deps: Pick<ExecutorDeps, 'mcp'>,
   plan: PlanRow,
   stored: StoredSteps,
   ctx: McpCallContext,
@@ -972,6 +1011,11 @@ async function finish(deps: ExecutorDeps, plan: PlanRow, emit: Emit): Promise<vo
   await setPreviewStatus(deps.prisma, plan.id, 'EXECUTED');
   const intent = plan.intent as Parameters<typeof describeIntent>[0];
   const what = describeIntent(intent);
+  const inferences = await deps.prisma.inference.findMany({
+    where: { agentRequestId: plan.agentRequestId },
+    orderBy: { createdAt: 'asc' },
+  });
+  const quote = plan.quote as QuoteSummary | null;
   const card: ReceiptCard = {
     type: 'receipt',
     actionPlanId: plan.id,
@@ -980,6 +1024,9 @@ async function finish(deps: ExecutorDeps, plan: PlanRow, emit: Emit): Promise<vo
     amountUsd: new Decimal(plan.amountUsd.toString()).toFixed(2),
     approvedBy: plan.policyOutcome === 'STEP_UP' ? 'HUMAN' : 'AGENT',
     txs: txViews(deps, rows),
+    ...(quote ? { quote } : {}),
+    inferences: inferenceRefs(inferences),
+    completedAt: (deps.now?.() ?? new Date()).toISOString(),
     decisionLog: { status: 'PENDING' },
   };
   await postPlanMessage(deps.prisma, plan.id, `Done: ${what}.`, [card]);
@@ -1027,7 +1074,7 @@ async function fail(deps: ExecutorDeps, plan: PlanRow, message: string, emit: Em
 }
 
 async function priceMoved(
-  deps: ExecutorDeps,
+  deps: Pick<ExecutorDeps, 'prisma' | 'jobs'>,
   plan: PlanRow,
   moved: PriceMoved,
   emit: Emit,
@@ -1082,4 +1129,5 @@ export async function abandonPlan(
     ? `Transaction ${pending.txHash} has no receipt yet (${reason}). It was not re-sent — check the explorer.`
     : `Your agent could not start this action (${reason}). Nothing was traded.`;
   await fail(deps, plan, message, emit);
+  await settled(deps, planId, 'failed');
 }

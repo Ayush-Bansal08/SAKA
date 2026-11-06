@@ -702,3 +702,162 @@ describe('PHASE 05 pipeline + execution', () => {
     }
   });
 });
+
+describe('PHASE 06 views: cards carry their checks and proofs; activity, drawer and inbox APIs', () => {
+  it('preview shows the checks; receipt shows amounts + 0G inferences; drawer, trace and activity', async () => {
+    const h = await harness();
+    try {
+      const r = await h.ask(swapUsd(5));
+      const preview = r.cards.find((c) => c.type === 'preview')!;
+      expect(preview.checks).toMatchObject({
+        simulation: { ok: true },
+        guard: { verdict: 'approve', unavailable: false },
+      });
+      expect((preview.checks as { breakdown: unknown[] }).breakdown.length).toBeGreaterThan(0);
+      // $5 of USDC out minus the $0.05 gas: what the human really keeps.
+      expect((preview.quote as { netOutUsd: string }).netOutUsd).toBe('4.95');
+
+      expect(await h.exec(r.planId!)).toBe('executed');
+      const receiptMsg = await h.app.deps.prisma.chatMessage.findFirstOrThrow({
+        where: { userId: h.userId, text: { startsWith: 'Done:' } },
+      });
+      const receipt = (receiptMsg.cards as Record<string, unknown>[])[0]!;
+      expect(receipt).toMatchObject({
+        type: 'receipt',
+        quote: { amountIn: { symbol: 'ETH' }, amountOut: { symbol: 'USDC' } },
+      });
+      const roles = (receipt.inferences as { role: string }[]).map((i) => i.role);
+      expect(roles).toEqual(expect.arrayContaining(['PLANNER', 'GUARD']));
+      expect(typeof receipt.completedAt).toBe('string');
+
+      // Plan drawer: request text, run id, calldata targets, inferences.
+      const plan = await h.app.inject({
+        method: 'GET',
+        url: `/plans/${r.planId}`,
+        headers: auth(h),
+      });
+      expect(plan.statusCode).toBe(200);
+      const view = plan.json() as {
+        traceId: string;
+        requestText: string;
+        calls: { to: string; selector: string | null }[];
+        inferences: unknown[];
+      };
+      expect(view.requestText).toBe('do it');
+      expect(view.calls.length).toBeGreaterThan(0);
+      expect(view.calls[0]!.selector).toMatch(/^0x[0-9a-f]{8}$/);
+      expect(view.inferences.length).toBeGreaterThanOrEqual(2);
+
+      // Full timeline of the run, oldest first; another human sees nothing.
+      const trace = await h.app.inject({
+        method: 'GET',
+        url: `/traces/${view.traceId}/events`,
+        headers: auth(h),
+      });
+      const events = (trace.json() as { events: { title: string; ts: string }[] }).events;
+      expect(events[0]!.title).toBe('Planning on 0G');
+      expect(events.map((e) => e.title)).toContain('Policy: AUTO — your agent may do this alone');
+      expect(events).toEqual([...events].sort((a, b) => a.ts.localeCompare(b.ts)));
+      const other = await devSignIn(h.app, uniqueName('stranger'));
+      const stolen = await h.app.inject({
+        method: 'GET',
+        url: `/traces/${view.traceId}/events`,
+        headers: { authorization: `Bearer ${other.token}` },
+      });
+      expect((stolen.json() as { events: unknown[] }).events).toEqual([]);
+
+      // Activity list with outcome filters.
+      const executed = await h.app.inject({
+        method: 'GET',
+        url: '/plans?outcome=EXECUTED',
+        headers: auth(h),
+      });
+      expect(executed.json()).toMatchObject({
+        plans: [
+          {
+            id: r.planId,
+            outcome: 'EXECUTED',
+            approvedBy: 'AGENT',
+            type: 'swap_exact_in',
+            requestText: 'do it',
+            tx: { hash: expect.stringMatching(/^0x/) },
+          },
+        ],
+      });
+      const refused = await h.app.inject({
+        method: 'GET',
+        url: '/plans?outcome=REFUSED',
+        headers: auth(h),
+      });
+      expect((refused.json() as { plans: unknown[] }).plans).toEqual([]);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('pending approvals feed the inbox; a denied plan shows as DENIED in activity', async () => {
+    const h = await harness();
+    try {
+      const r = await h.ask(swapUsd(60));
+      const card = r.cards.find((c) => c.type === 'approval')!;
+      expect(card.checks).toBeDefined();
+      const pending = await h.app.inject({
+        method: 'GET',
+        url: '/approvals/pending',
+        headers: auth(h),
+      });
+      expect(pending.json()).toMatchObject({
+        devApproveAvailable: true,
+        approvals: [{ id: card.approvalId, actionPlanId: r.planId, amountUsd: '60.00' }],
+      });
+      await h.app.inject({
+        method: 'POST',
+        url: `/approvals/${card.approvalId}/deny`,
+        headers: auth(h),
+      });
+      const after = await h.app.inject({
+        method: 'GET',
+        url: '/approvals/pending',
+        headers: auth(h),
+      });
+      expect((after.json() as { approvals: unknown[] }).approvals).toEqual([]);
+      const denied = await h.app.inject({
+        method: 'GET',
+        url: '/plans?outcome=DENIED',
+        headers: auth(h),
+      });
+      expect(denied.json()).toMatchObject({
+        plans: [{ id: r.planId, outcome: 'DENIED', approvedBy: null }],
+      });
+    } finally {
+      await h.close();
+    }
+  });
+
+  it('a refusal offers a corrected request (retry when a check was unavailable); activity pages', async () => {
+    const h = await harness();
+    try {
+      h.script.guard = 'error';
+      const r = await h.ask(swapUsd(5));
+      const card = r.cards.find((c) => c.type === 'refusal')!;
+      expect(card.suggestedRequest).toBe('Swap $5 ETH to USDC');
+      expect(card.checks).toMatchObject({ guard: { unavailable: true, verdict: 'block' } });
+      await h.ask(swapUsd(5));
+      const page1 = await h.app.inject({ method: 'GET', url: '/plans?limit=1', headers: auth(h) });
+      const p1 = page1.json() as { plans: { id: string }[]; nextCursor: string | null };
+      expect(p1.plans).toHaveLength(1);
+      expect(p1.nextCursor).toBe(p1.plans[0]!.id);
+      const page2 = await h.app.inject({
+        method: 'GET',
+        url: `/plans?limit=1&cursor=${p1.nextCursor}`,
+        headers: auth(h),
+      });
+      const p2 = page2.json() as { plans: { id: string; outcome: string }[]; nextCursor: null };
+      expect(p2.plans[0]!.id).not.toBe(p1.plans[0]!.id);
+      expect(p2.plans[0]!.outcome).toBe('REFUSED');
+      expect(p2.nextCursor).toBeNull();
+    } finally {
+      await h.close();
+    }
+  });
+});

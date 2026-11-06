@@ -14,6 +14,7 @@ import {
   CHAINS,
   Decimal,
   riskProfileSettings,
+  UniswapMcp,
   type AgentMessageView,
   type Card,
 } from '@warden/shared';
@@ -29,6 +30,8 @@ import {
   type PlannerContext,
 } from './context.js';
 import { describeIntent } from './describe.js';
+import { factCards } from './fact-cards.js';
+import { Explainer } from '../ai0g/explainer.js';
 import { buildPortfolio } from '../portfolio/service.js';
 import { REFERENCE_SWAPPER } from '../portfolio/market.js';
 import { executionTokens } from '../wallet/tokens.js';
@@ -138,6 +141,7 @@ export const agentRoutes: FastifyPluginAsyncZod = async (app) => {
                 balances,
                 chainId: env.EXECUTION_CHAIN_ID,
                 allowlist: env.TOKEN_ALLOWLIST_JSON,
+                mcp: mcp,
               },
               user,
               wallet,
@@ -211,9 +215,24 @@ export const agentRoutes: FastifyPluginAsyncZod = async (app) => {
             }
           } else {
             text = result.text;
+            const facts = factCards(result.facts, { userText: request.body.text, portfolio });
+            // The pool pick is explained by 0G (template fallback when the explainer is down).
+            const poolFact = result.facts.find((f) => f.tool === 'compare_pools');
+            const pools = poolFact
+              ? UniswapMcp.TOOL_OUTPUT_SCHEMAS.compare_pools.safeParse(poolFact.output)
+              : null;
+            if (pools?.success) {
+              const pick = await new Explainer(client, ctx).explainPoolPick(pools.data);
+              for (const card of facts)
+                if ((card.data as { kind?: string } | undefined)?.kind === 'pool_compare')
+                  card.body = pick;
+            }
             cards = [
               { type: 'info', title: 'Agent reply', body: result.text, zg: result.zg },
-              ...(result.cards ?? []),
+              // Deterministic facts from the tools the planner used (PHASE 06 InfoCard).
+              ...facts,
+              // Tool facts supersede the model's own summary cards (no duplicate answers).
+              ...(facts.length ? [] : (result.cards ?? [])),
             ];
           }
           await prisma.$transaction([

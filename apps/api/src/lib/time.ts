@@ -58,3 +58,56 @@ export function dayBoundsInZone(
   end = nextGuess - offsetMs(new Date(end), tz);
   return { start: new Date(start), end: new Date(end), day, timeZone: tz };
 }
+
+/** Wall-clock hour and minute at `now` in `timeZone`. Invalid zones → UTC. */
+export function localTimeIn(now: Date, timeZone: string): { hour: number; minute: number } {
+  const p = partsIn(now, isValidTimeZone(timeZone) ? timeZone : 'UTC');
+  return { hour: p.hour, minute: p.minute };
+}
+
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+/** UTC instant of a local wall-clock time in `timeZone` (two passes absorb DST changes). */
+function localToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  tz: string,
+): number {
+  const guess = Date.UTC(year, month - 1, day, hour, minute);
+  let t = guess - offsetMs(new Date(guess), tz);
+  t = guess - offsetMs(new Date(t), tz);
+  return t;
+}
+
+/**
+ * Next run of a schedule ("every day at 09:00", "every week on mon at 08:30") strictly after
+ * `now`, in the user's time zone. Weekly without a day keeps today's weekday. Invalid zones → UTC.
+ */
+export function nextLocalRun(
+  now: Date,
+  timeZone: string,
+  atLocalTime: string,
+  every: 'day' | 'week',
+  dayOfWeek?: string | null,
+): Date {
+  const tz = isValidTimeZone(timeZone) ? timeZone : 'UTC';
+  const [hour, minute] = atLocalTime.split(':').map(Number) as [number, number];
+  const p = partsIn(now, tz);
+  const todayIdx = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+  const target =
+    every === 'week'
+      ? dayOfWeek && (WEEKDAYS as readonly string[]).includes(dayOfWeek)
+        ? WEEKDAYS.indexOf(dayOfWeek as (typeof WEEKDAYS)[number])
+        : todayIdx
+      : null;
+  for (let add = 0; add <= 8; add++) {
+    if (target !== null && (todayIdx + add) % 7 !== target) continue;
+    const t = localToUtc(p.year, p.month, p.day + add, hour, minute, tz);
+    if (t > now.getTime()) return new Date(t);
+  }
+  // Unreachable for valid input (a matching day exists within 8 days).
+  return new Date(now.getTime() + 86_400_000);
+}

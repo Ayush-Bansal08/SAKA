@@ -54,6 +54,66 @@ describe('get_quote', () => {
     });
   });
 
+  describe('UNISWAP_BLOCKED_POOLS route selection', () => {
+    const BAD = '0x3289680dD4d6C10bb19b899729cda5eEF58AEfF1';
+    const GOOD = '0xFeEd501c2B21D315F04946F85fC6416B640240b5';
+    const v3 = (address: string, out: string) => {
+      const body = quoteEthToUsdc();
+      return {
+        ...body,
+        quote: {
+          ...body.quote,
+          output: { ...body.quote.output, amount: out },
+          route: [[{ ...body.quote.route[0]![0]!, type: 'v3-pool', address }]],
+        },
+      };
+    };
+    const byProtocol = (h: ReturnType<typeof harness>, v3Body: unknown, v4Body: unknown) =>
+      h.http.on('POST', `${TRADE}/quote`, (call) => ({
+        body: (call.body as { protocols: string[] }).protocols[0] === 'V3' ? v3Body : v4Body,
+      }));
+
+    it('never keeps a blocked pool, however good its quote', async () => {
+      const h = harness({ UNISWAP_BLOCKED_POOLS: BAD });
+      byProtocol(h, v3(BAD, '99000000'), quoteEthToUsdc());
+      const out = await ok(h, 'get_quote', quoteArgs);
+      expect(out.amountOut.raw).toBe('26350000');
+      expect(JSON.stringify(out.route)).not.toContain(BAD.toLowerCase());
+    });
+
+    it('takes the other protocol when that one is healthy', async () => {
+      const h = harness({ UNISWAP_BLOCKED_POOLS: BAD });
+      h.http.on('POST', `${TRADE}/quote`, (call) =>
+        (call.body as { protocols: string[] }).protocols[0] === 'V3'
+          ? { body: v3(GOOD, '27000000') }
+          : { status: 404, body: { errorCode: 'NoRouteFoundError' } },
+      );
+      expect((await ok(h, 'get_quote', quoteArgs)).amountOut.raw).toBe('27000000');
+    });
+
+    it('fails clearly when only blocked routes exist', async () => {
+      const h = harness({ UNISWAP_BLOCKED_POOLS: BAD });
+      h.http.on('POST', `${TRADE}/quote`, (call) =>
+        (call.body as { protocols: string[] }).protocols[0] === 'V3'
+          ? { body: v3(BAD, '99000000') }
+          : { status: 404, body: { errorCode: 'NoRouteFoundError' } },
+      );
+      expect((await fail(h, 'get_quote', quoteArgs)).code).toBe('NO_ROUTE');
+    });
+
+    it('leaves mainnet reference quotes alone', async () => {
+      const h = harness({ UNISWAP_BLOCKED_POOLS: BAD });
+      h.http.on('POST', `${TRADE}/quote`, { body: quoteEthToUsdc() });
+      await ok(h, 'get_quote', { ...quoteArgs, chainId: 1, amount: '1' });
+      const [call] = h.http.callsTo('/quote');
+      expect((call!.body as { protocols: string[] }).protocols).toEqual(['V2', 'V3', 'V4']);
+    });
+
+    it('refuses a value that is not a pool id', () => {
+      expect(() => harness({ UNISWAP_BLOCKED_POOLS: 'nonsense' })).toThrow();
+    });
+  });
+
   it('caches identical quotes for 15 s', async () => {
     const h = harness();
     h.http.on('POST', `${TRADE}/quote`, { body: quoteEthToUsdc() });

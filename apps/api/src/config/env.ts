@@ -67,6 +67,12 @@ export const EnvSchema = z.object({
   ZG_MODEL_PLANNER: z.string().min(1).optional(),
   ZG_MODEL_PLANNER_FALLBACK: z.string().min(1).optional(),
   ZG_MODEL_GUARD: z.string().min(1).optional(),
+  /**
+   * How the guard asks: `decisions` (Vela 2.0 via /v1/decisions, the default) or `chat` (the
+   * guard model via /v1/chat/completions with a strict JSON verdict — for when the decisions
+   * models are down; set ZG_MODEL_GUARD to a chat model such as glm-5.3). Fail-closed either way.
+   */
+  ZG_GUARD_MODE: z.enum(['decisions', 'chat']).default('decisions'),
   ZG_MODEL_EXPLAINER: z.string().min(1).optional(),
   ZG_PLANNER_TIMEOUT_MS: z.coerce.number().int().min(100).max(120000).default(12000),
   /** Per-call budget for guard (/decisions) and explainer calls. */
@@ -163,6 +169,25 @@ export const EnvSchema = z.object({
   ),
   /** 0G chain explorer used for decision-log links (`<base>/tx/<zgTxHash>`). */
   ZG_STORAGE_EXPLORER_URL: urlWithoutTrailingSlash.default('https://chainscan-galileo.0g.ai'),
+
+  // --- Mode B & Telegram (PHASE 08) ---------------------------------------------
+  /** Without it, alerts stay in the web inbox and the bot does not start. */
+  TELEGRAM_BOT_TOKEN: z.string().trim().min(1).optional(),
+  /** Bot username without "@", for the t.me link. */
+  TELEGRAM_BOT_USERNAME: z
+    .string()
+    .trim()
+    .regex(/^@?[A-Za-z0-9_]{3,64}$/, 'must be a Telegram username')
+    .transform((v) => v.replace(/^@/, ''))
+    .optional(),
+  /** Checks that webhook calls come from Telegram. Required to use the webhook (production). */
+  TELEGRAM_WEBHOOK_SECRET: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{16,256}$/, 'must be 16-256 letters, digits, _ or -')
+    .optional(),
+  /** Budget for one Mode B pass over every user; the rest continue next tick. */
+  MODEB_TICK_BUDGET_MS: z.coerce.number().int().min(1_000).max(300_000).default(45_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -1,10 +1,24 @@
-/** Background worker entry: BullMQ workers + repeatable schedules (Mode B lands in later phases). */
+/** Background worker entry: BullMQ workers + repeatable schedules, including Mode B and Telegram. */
 import './config/load-dotenv.js';
 import { Queue, Worker } from 'bullmq';
+import { Api } from 'grammy';
 import { EnvError, loadEnv, type Env } from './config/env.js';
 import { runBalanceWatch } from './jobs/balance-watcher.js';
 import { runHeartbeat } from './jobs/heartbeat.js';
-import { APPROVAL_SWEEP_EVERY_MS, HEARTBEAT_EVERY_MS, JOBS, QUEUES } from './jobs/queues.js';
+import {
+  APPROVAL_SWEEP_EVERY_MS,
+  HEARTBEAT_EVERY_MS,
+  HOOK_INDEX_EVERY_MS,
+  JOBS,
+  MODEB_TICK_EVERY_MS,
+  NOTIFY_MAX_PER_SECOND,
+  QUEUES,
+  TRIGGER_EVALUATE_EVERY_MS,
+} from './jobs/queues.js';
+import { ZgClient } from './modules/ai0g/client.js';
+import { Explainer } from './modules/ai0g/explainer.js';
+import { indexHooks } from './modules/hooks/indexer.js';
+import { evaluateTriggers } from './modules/triggers/evaluator.js';
 import { ApprovalsService } from './modules/approvals/service.js';
 import { createApprovalProvider } from './modules/approvals/dev-approval-provider.js';
 import { createChainClient } from './modules/execution/chain.js';
@@ -24,6 +38,10 @@ import { createLogger } from './lib/logger.js';
 import { onShutdown } from './lib/shutdown.js';
 import { createUniswapMcpClient } from './modules/mcp/client.js';
 import { BalanceReader, PriceService } from './modules/portfolio/market.js';
+import { runModeBTick } from './modules/modeb/runner.js';
+import { approvalResolved, planSettled, type ModeBDeps } from './modules/modeb/suggestions.js';
+import { deliver, type TelegramApi } from './modules/telegram/delivery.js';
+import { createNotifications, type Notification } from './modules/telegram/notifications.js';
 import { TraceBus } from './modules/trace/trace-bus.js';
 
 function readEnvOrExit(): Env {
@@ -63,11 +81,13 @@ await systemQueue.upsertJobScheduler(
 
 // --- PHASE 05: approvals, execution, decision logs ------------------------------------------
 const jobs = createBullJobs(env.REDIS_URL);
+const notifications = createNotifications(env);
 const approvals = new ApprovalsService({
   prisma,
   trace: traceBus,
   jobs,
   ttlSeconds: env.APPROVAL_TTL_SECONDS,
+  onResolved: (approval, outcome) => approvalResolved({ prisma, notifications }, approval, outcome),
 });
 const approvalProvider = createApprovalProvider(env, approvals, (id) =>
   prisma.approval.findUnique({ where: { id }, select: { expiresAt: true } }),
@@ -119,6 +139,7 @@ if (mcp) {
         chainId: env.EXECUTION_CHAIN_ID,
         allowlist: env.TOKEN_ALLOWLIST_JSON,
         inactivePollMs: env.BALANCE_POLL_INACTIVE_MS,
+        notifications,
         log,
       });
       return { checked: result.checked, deposits: result.deposits };
@@ -148,6 +169,7 @@ if (mcp) {
     jobs,
     approvals,
     approvalProvider,
+    onPlanSettled: (planId, outcome) => planSettled({ prisma, notifications }, planId, outcome),
   };
   executeWorker = new Worker(
     QUEUES.execute,
@@ -198,6 +220,161 @@ decisionLogWorker.on('error', (err) => log.error({ err }, 'worker error'));
 if (!storage)
   log.warn('ZG_STORAGE_PRIVATE_KEY is not set: decision logs stay PENDING (not uploaded)');
 
+// --- PHASE 07: hook indexer + trigger evaluator -----------------------------------------------
+const hooksQueue = new Queue(QUEUES.hooks, { connection: bullConnection });
+const triggersQueue = new Queue(QUEUES.triggers, { connection: bullConnection });
+const modebQueue = new Queue(QUEUES.modeb, { connection: bullConnection });
+let hooksWorker: Worker | null = null;
+let triggersWorker: Worker | null = null;
+let modebWorker: Worker | null = null;
+if (mcp) {
+  // Pipeline inferences are traced to the user; indexer explanations have no user (no-op trace).
+  const zg = env.ZG_API_KEY ? new ZgClient(env, prisma, traceBus) : null;
+  const zgSystem = env.ZG_API_KEY
+    ? new ZgClient(env, prisma, { emit: async () => undefined })
+    : null;
+  const explainer = zgSystem
+    ? new Explainer(zgSystem, { userId: 'system', traceId: 'hook-indexer' })
+    : null;
+  await hooksQueue.upsertJobScheduler(
+    JOBS.hookIndex,
+    { every: HOOK_INDEX_EVERY_MS },
+    { name: JOBS.hookIndex, opts: { removeOnComplete: 20, removeOnFail: 50 } },
+  );
+  hooksWorker = new Worker(
+    QUEUES.hooks,
+    async () => {
+      const deps = {
+        prisma,
+        redis,
+        mcp,
+        explain: explainer
+          ? (s: Parameters<Explainer['explainHookDetailed']>[0]) =>
+              explainer.explainHookDetailed(s, { scope: 'hook explorer' })
+          : null,
+        traceBus,
+        executionChainId: env.EXECUTION_CHAIN_ID,
+        log: log.child({ module: 'hooks' }),
+      };
+      const market = await indexHooks(deps, 'market').catch((err: unknown) => ({
+        error: err instanceof Error ? err.message : String(err),
+      }));
+      const execution = await indexHooks(deps, 'execution').catch((err: unknown) => ({
+        error: err instanceof Error ? err.message : String(err),
+      }));
+      return { market, execution };
+    },
+    { connection: bullConnection, concurrency: 1, lockDuration: 10 * 60_000 },
+  );
+  hooksWorker.on('error', (err) => log.error({ err }, 'worker error'));
+
+  await triggersQueue.upsertJobScheduler(
+    JOBS.triggerEvaluate,
+    { every: TRIGGER_EVALUATE_EVERY_MS },
+    { name: JOBS.triggerEvaluate, opts: { removeOnComplete: 20, removeOnFail: 50 } },
+  );
+  triggersWorker = new Worker(
+    QUEUES.triggers,
+    async () =>
+      evaluateTriggers({
+        prisma,
+        redis,
+        prices,
+        balances,
+        traceBus,
+        chainId: env.EXECUTION_CHAIN_ID,
+        notifications,
+        webUrl: env.WEB_URL,
+        log: log.child({ module: 'triggers' }),
+        pipeline: {
+          env,
+          prisma,
+          mcp,
+          prices,
+          traceBus,
+          zg,
+          chain,
+          approvals,
+          approvalProvider,
+          jobs,
+        },
+      }),
+    // One evaluation at a time: rules fire at most once per window.
+    { connection: bullConnection, concurrency: 1, lockDuration: 5 * 60_000 },
+  );
+  triggersWorker.on('error', (err) => log.error({ err }, 'worker error'));
+
+  // --- PHASE 08: Mode B detectors ---------------------------------------------------------------
+  const modeBDeps: ModeBDeps = {
+    env,
+    prisma,
+    redis,
+    mcp,
+    prices,
+    balances,
+    traceBus,
+    zg,
+    chain,
+    approvals,
+    approvalProvider,
+    jobs,
+    notifications,
+    log: log.child({ module: 'modeb' }),
+  };
+  await modebQueue.upsertJobScheduler(
+    JOBS.modebTick,
+    { every: MODEB_TICK_EVERY_MS },
+    { name: JOBS.modebTick, opts: { removeOnComplete: 20, removeOnFail: 50 } },
+  );
+  modebWorker = new Worker(
+    QUEUES.modeb,
+    async () => runModeBTick(modeBDeps, { budgetMs: env.MODEB_TICK_BUDGET_MS }),
+    // One pass at a time: a slow tick must not overlap the next one.
+    { connection: bullConnection, concurrency: 1, lockDuration: 5 * 60_000 },
+  );
+  modebWorker.on('failed', (job, err) =>
+    log.error({ err: err.message, jobId: job?.id }, 'Mode B tick failed'),
+  );
+  modebWorker.on('error', (err) => log.error({ err }, 'worker error'));
+} else {
+  await hooksQueue.removeJobScheduler(JOBS.hookIndex).catch(() => undefined);
+  await triggersQueue.removeJobScheduler(JOBS.triggerEvaluate).catch(() => undefined);
+  await modebQueue.removeJobScheduler(JOBS.modebTick).catch(() => undefined);
+  log.warn('MCP_AUTH_TOKEN is not set: Mode B is disabled');
+}
+
+// --- PHASE 08: outgoing Telegram --------------------------------------------------------------
+let notifyWorker: Worker | null = null;
+if (env.TELEGRAM_BOT_TOKEN) {
+  const telegram = new Api(env.TELEGRAM_BOT_TOKEN) as unknown as TelegramApi;
+  notifyWorker = new Worker(
+    QUEUES.notify,
+    async (job) =>
+      deliver(
+        {
+          prisma,
+          api: telegram,
+          secret: env.ENCRYPTION_KEY,
+          webUrl: env.WEB_URL,
+          chainId: env.EXECUTION_CHAIN_ID,
+        },
+        job.data as Notification,
+      ),
+    {
+      connection: bullConnection,
+      // One at a time: a 429 wait in delivery holds the whole queue, which is what Telegram wants.
+      concurrency: 1,
+      limiter: { max: NOTIFY_MAX_PER_SECOND, duration: 1_000 },
+    },
+  );
+  notifyWorker.on('failed', (job, err) =>
+    log.warn({ err: err.message, kind: job?.data?.kind }, 'telegram delivery failed'),
+  );
+  notifyWorker.on('error', (err) => log.error({ err }, 'worker error'));
+} else {
+  log.warn('TELEGRAM_BOT_TOKEN is not set: alerts stay in the web inbox');
+}
+
 // The scheduler runs the first heartbeat immediately, then every HEARTBEAT_EVERY_MS.
 log.info(
   {
@@ -213,8 +390,19 @@ onShutdown(log, async () => {
   await walletWorker?.close();
   await executeWorker?.close();
   await decisionLogWorker.close();
+  await hooksWorker?.close();
+  await triggersWorker?.close();
+  await modebWorker?.close();
+  await notifyWorker?.close();
   await jobs.close();
-  await Promise.allSettled([systemQueue.close(), walletQueue.close()]);
+  await notifications.close();
+  await Promise.allSettled([
+    systemQueue.close(),
+    walletQueue.close(),
+    hooksQueue.close(),
+    triggersQueue.close(),
+    modebQueue.close(),
+  ]);
   await mcp?.close();
   await traceBus.close();
   await Promise.allSettled([prisma.$disconnect(), redis.quit(), bullConnection.quit()]);

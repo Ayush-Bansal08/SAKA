@@ -847,3 +847,85 @@ describe('propose tool schema', () => {
     expect(fieldsByType).toContain('transfer: token, amount, recipient, reason');
   });
 });
+
+describe('guard (chat mode, ZG_GUARD_MODE=chat — used while the decisions models are down)', () => {
+  const verdict = (content: string) => response({ role: 'assistant', content });
+
+  it('asks the guard model over chat completions and approves on a confident JSON verdict', async () => {
+    const { client, fetcher } = setup(
+      [
+        verdict(
+          '```json\n{"verdict":"approve","p_approve":0.91,"risk":0.12,"concern":"none"}\n```',
+        ),
+      ],
+      { ZG_GUARD_MODE: 'chat', ZG_MODEL_GUARD: 'glm-5.3' },
+    );
+    const result = await guard(client, ctx, guardInput);
+    expect(result).toMatchObject({
+      verdict: 'approve',
+      pApprove: 0.91,
+      concerns: ['none'],
+      unavailable: false,
+    });
+    expect(String((fetcher.mock.calls[0] as unknown[])[0])).toMatch(/\/chat\/completions$/);
+    const body = requestBody(fetcher);
+    expect(body.model).toBe('glm-5.3');
+    expect(body.messages[1].content).toContain('Simulation: passed');
+  });
+
+  it('an approval that names a concern never reads like a block (live regression)', async () => {
+    const { client, fetcher } = setup(
+      [verdict('{"verdict":"approve","p_approve":0.85,"risk":0.3,"concern":"price_impact"}')],
+      { ZG_GUARD_MODE: 'chat' },
+    );
+    const result = await guard(client, ctx, guardInput);
+    expect(result).toMatchObject({
+      verdict: 'approve',
+      reason: 'Safety checks passed (worth watching: price impact).',
+    });
+    expect(result.reason).not.toMatch(/block/i);
+    expect(fetcher).toHaveBeenCalledTimes(1); // no explainer call for an approval
+  });
+
+  it('a low-confidence block with no concern says so plainly (live regression)', async () => {
+    const { client, fetcher } = setup(
+      [verdict('{"verdict":"approve","p_approve":0.7,"risk":0.3,"concern":"none"}')],
+      { ZG_GUARD_MODE: 'chat' },
+    );
+    expect(await guard(client, ctx, guardInput)).toMatchObject({
+      verdict: 'block',
+      reason: 'The 0G guard was not confident enough to approve (p=0.70, needs 0.80).',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1); // the explainer is not asked to guess
+  });
+
+  it('blocks below p 0.8 even when the model says approve', async () => {
+    const { client } = setup(
+      [
+        verdict('{"verdict":"approve","p_approve":0.6,"risk":0.5,"concern":"large_size"}'),
+        response({ role: 'assistant', content: 'This trade is large for your portfolio.' }),
+      ],
+      { ZG_GUARD_MODE: 'chat' },
+    );
+    expect(await guard(client, ctx, guardInput)).toMatchObject({
+      verdict: 'block',
+      unavailable: false,
+    });
+  });
+
+  it.each([
+    ['prose instead of JSON', 'Looks fine to me!'],
+    ['an unknown concern', '{"verdict":"approve","p_approve":0.9,"risk":0.1,"concern":"vibes"}'],
+    [
+      'a probability out of range',
+      '{"verdict":"approve","p_approve":1.4,"risk":0.1,"concern":"none"}',
+    ],
+  ])('fails closed on %s', async (_label, content) => {
+    const { client } = setup([verdict(content)], { ZG_GUARD_MODE: 'chat' });
+    expect(await guard(client, ctx, guardInput)).toMatchObject({
+      verdict: 'block',
+      unavailable: true,
+      reason: GUARD_UNAVAILABLE_REASON,
+    });
+  });
+});

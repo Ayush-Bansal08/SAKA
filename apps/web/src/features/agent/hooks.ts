@@ -36,10 +36,16 @@ export function changesPlanCards(e: TraceEvent): boolean {
     e.kind === 'receipt' ||
     e.kind === 'log' ||
     e.kind === 'error' ||
+    e.kind === 'detector' ||
     (e.kind === 'tx' && e.title === 'Executing') ||
-    (e.kind === 'policy' && e.title === 'Cancelled by you')
+    (e.kind === 'policy' &&
+      ['Cancelled by you', 'Declined by you', 'Accepted by you'].includes(e.title))
   );
 }
+
+/** The one query function for the chat history (every observer of the key must share it). */
+export const fetchAgentMessages = ({ signal }: { signal?: AbortSignal }) =>
+  api('/agent/messages', { schema: AgentMessagesResponseSchema, ...(signal ? { signal } : {}) });
 
 export function useAgentMessages() {
   const qc = useQueryClient();
@@ -51,8 +57,7 @@ export function useAgentMessages() {
   });
   return useQuery({
     queryKey: agentKeys.messages,
-    queryFn: ({ signal }) =>
-      api('/agent/messages', { schema: AgentMessagesResponseSchema, signal }),
+    queryFn: fetchAgentMessages,
     // Fallback to the live stream: poll while waiting for a reply or while a plan is moving.
     refetchInterval: (q) =>
       isAwaitingReply(q.state.data)

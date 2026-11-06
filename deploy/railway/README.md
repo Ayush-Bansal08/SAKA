@@ -37,5 +37,9 @@ The image also has a generic entry, `node dist/main.js`, that picks the process 
    - `MCP_AUTH_TOKEN` (same value on `api` and `mcp`), `MCP_RESUME_SECRET` (`openssl rand -hex 32`)
    - Railway sets `PORT`; the health check is `GET /health`.
 
+6. **`bot` service** (`deploy/railway/bot.json`): set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and
+   `TELEGRAM_WEBHOOK_SECRET` on `api`, `worker` and `bot`. The service registers the webhook on
+   `API_URL/telegram/webhook`, then exits. The worker sends all outgoing messages.
+
 > Production refuses to boot with dev identity/approval providers. Until World ID lands in
 > PHASE 10, there is no production mode to deploy (by design).

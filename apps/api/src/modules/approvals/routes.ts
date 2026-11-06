@@ -1,12 +1,18 @@
 /**
  * Approval routes (PHASE 05 §4). Owner only — another human gets 404, never a state change.
+ *   GET  /approvals/pending          the human's open approvals (nav badge, inbox)
  *   GET  /approvals/:id              approval page data
  *   POST /approvals/:id/dev-approve  DEV provider only (never registered in production)
  *   POST /approvals/:id/deny         provider-independent, stays forever
  */
 import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import { ActionIntentSchema, type ApprovalView } from '@warden/shared';
+import {
+  ActionIntentSchema,
+  Decimal,
+  type ApprovalView,
+  type PendingApprovalsResponse,
+} from '@warden/shared';
 import { devProvidersAllowed } from '../../config/env.js';
 import { AppError } from '../../lib/errors.js';
 import { authOf, requireUser } from '../auth/require-user.js';
@@ -35,6 +41,40 @@ export const approvalRoutes: FastifyPluginAsyncZod = async (app) => {
       devApprove,
     );
   };
+
+  app.get(
+    '/approvals/pending',
+    { preHandler: requireUser },
+    async (request): Promise<PendingApprovalsResponse> => {
+      const rows = await prisma.approval.findMany({
+        where: {
+          userId: authOf(request).user.id,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() },
+        },
+        include: { actionPlan: { select: { intent: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+      return {
+        approvals: rows.map((a) => {
+          const intent = ActionIntentSchema.safeParse(a.actionPlan.intent);
+          return {
+            id: a.id,
+            actionPlanId: a.actionPlanId,
+            summary: intent.success ? describeIntent(intent.data) : 'Agent action',
+            reason: a.reason,
+            amountUsd: new Decimal(a.amountUsd.toString()).toFixed(2),
+            expiresAt: a.expiresAt.toISOString(),
+            providerKind: a.providerKind,
+            channel: a.channel,
+            createdAt: a.createdAt.toISOString(),
+          };
+        }),
+        devApproveAvailable: devApprove,
+      };
+    },
+  );
 
   app.get(
     '/approvals/:id',

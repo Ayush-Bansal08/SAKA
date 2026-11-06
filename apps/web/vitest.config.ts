@@ -10,5 +10,10 @@ export default defineConfig({
       ),
     },
   },
-  test: { include: ['src/**/*.test.ts'], environment: 'node' },
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+    environment: 'node',
+    // Component tests opt into jsdom with `// @vitest-environment jsdom`.
+    setupFiles: ['./src/test/setup.ts'],
+  },
 });

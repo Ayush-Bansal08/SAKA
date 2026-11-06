@@ -204,6 +204,8 @@ enum SuggestionStatus {
   EXPIRED
   AUTO_EXECUTED
   INFO
+  /// Accepted or auto-run, but it ended without trading (failed, price moved, cancelled).
+  FAILED
 }
 
 enum HookBand {
@@ -247,6 +249,8 @@ model User {
   onboardingStep OnboardingStep @default(VERIFY)
   telegramChatId String?        @unique
   telegramMuted  Boolean        @default(false)
+  /// Per-detector "auto-act on suggestions" overrides (PHASE 08); null keeps the defaults.
+  autoAct        Json?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -265,6 +269,7 @@ model User {
   triggers         Trigger[]
   suggestions      Suggestion[]
   traceEvents      TraceEventRow[]
+  telegramLinks    TelegramLinkCode[]
 
   @@unique([identityIss, identitySub])
 }
@@ -592,6 +597,14 @@ model Trigger {
   nextRunAt   DateTime?
   lastFiredAt DateTime?
   fireCount   Int           @default(0)
+  /// Human summary from plan_trigger ("Sell 50% ETH → USDC when ETH ≥ $3,060").
+  summary     String        @default("")
+  /// The planner's RuleSpec (spec holds the canonical plan_trigger TriggerSpec).
+  rule        Json?
+  /// Chained progress: { step, planId, waiting } (PHASE 07).
+  state       Json?
+  /// What happened on the last fire ("Executed", "Needs approval", "Refused: …").
+  lastResult  String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -611,6 +624,20 @@ model Suggestion {
   actionPlanId      String?
   status            SuggestionStatus   @default(OPEN)
   telegramMessageId String?
+  title             String             @default("")
+  /// Detector facts behind the suggestion (shown to the explainer, kept as evidence).
+  event             Json?
+  /// Chat text offered by "Change".
+  prefill           String?
+  traceId           String?
+  /// How it ended, in plain words.
+  note              String?
+  /// Injected by POST /admin/simulate-event; shown as "Simulated (demo)".
+  simulated         Boolean            @default(false)
+  /// A prepared plan goes stale at this time (15 min).
+  expiresAt         DateTime?
+  /// The 0G inference that wrote the message (null = deterministic template).
+  inferenceId       String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
@@ -620,7 +647,21 @@ model Suggestion {
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
   @@index([actionPlanId])
-  @@index([status])
+  @@index([status, expiresAt])
+}
+
+/// One-time Telegram link code (the code itself is never stored, only its sha256).
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------------
@@ -643,14 +684,46 @@ model Hook {
   scoreBreakdown         Json
   explanation            String?
   explanationInferenceId String?
+  /// Score the stored explanation was written for (re-explain when the score changes).
+  explanationScore       Int?
+  contractName           String?
+  tvlUsd                 Decimal?  @db.Decimal(24, 2)
+  poolCount              Int       @default(0)
+  /// On-chain age (first pool / first seen), from score_hook facts.
+  ageDays                Float?
   firstSeenAt            DateTime  @default(now())
   lastSnapshot           Json
   lastCheckedAt          DateTime
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
+  snapshots HookSnapshot[]
+
   @@unique([chainId, address])
   @@index([band])
+  @@index([chainId, firstSeenAt])
+}
+
+/// A hook's observable state when it was first seen and whenever it changed (PHASE 07).
+model HookSnapshot {
+  id                String   @id @default(cuid())
+  hookId            String
+  takenAt           DateTime
+  score             Int
+  band              HookBand
+  codeHash          String?
+  implementation    String?
+  owner             String?
+  permissionsBitmap Int?
+  /// Pool fees at the time ({ poolId: lpFee }).
+  fees              Json
+  /// Human-readable differences from the previous snapshot (empty for the first).
+  changes           Json
+  createdAt         DateTime @default(now())
+
+  hook Hook @relation(fields: [hookId], references: [id], onDelete: Cascade)
+
+  @@index([hookId, takenAt])
 }
 
 model HookPool {
@@ -660,6 +733,8 @@ model HookPool {
   hookAddress    String
   token0         String
   token1         String
+  token0Symbol   String?
+  token1Symbol   String?
   fee            Int
   tickSpacing    Int
   tvlUsd         Decimal? @db.Decimal(24, 2)

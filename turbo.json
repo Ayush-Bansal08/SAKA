@@ -27,6 +27,10 @@
     "dev:worker": {
       "cache": false,
       "persistent": true
+    },
+    "dev:bot": {
+      "cache": false,
+      "persistent": true
     }
   }
 }

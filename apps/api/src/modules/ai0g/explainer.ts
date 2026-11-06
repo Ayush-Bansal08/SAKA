@@ -34,6 +34,15 @@ export interface MorningBriefData {
   alerts?: string[];
   suggestions?: string[];
   ethPriceUsd?: string | null;
+  risk?: { label: string; drivers: string[] } | null;
+  newHooks?: string[];
+  triggers?: string[];
+}
+
+export interface ExplainedText {
+  text: string;
+  /** The 0G inference that wrote it; null when the deterministic template was used. */
+  inferenceId: string | null;
 }
 
 type HookScore = Pick<UniswapMcp.ScoreHookOutput, 'hookAddress' | 'score' | 'band'> &
@@ -95,6 +104,49 @@ function clean(text: string): string {
 const usd = (value: string | null | undefined) =>
   value === null || value === undefined ? 'n/a' : `$${value}`;
 
+/**
+ * The message is written before the policy decides, so it cannot know who approves: telling the
+ * human to approve would be false for an action that runs alone. And without a plan there are no
+ * buttons and no chat to answer in, so a question is a dead end.
+ */
+function misleadsTheHuman(text: string, plan: ActionIntent | null): boolean {
+  return /\b(approve|confirm|reply)\b/i.test(text) || (!plan && text.includes('?'));
+}
+
+/** ≤ 30 words, built only from the event: what the message falls back to without 0G. */
+export function suggestionTemplate(event: DetectorEventSummary, plan: ActionIntent | null): string {
+  const summary = event.summary.replace(/[.!?]+$/, '');
+  return (plan ? `${summary}. I suggest: ${plan.reason}` : `${summary}.`)
+    .split(/\s+/)
+    .slice(0, 30)
+    .join(' ');
+}
+
+/** ≤ 6 "- " lines, built only from the supplied data. */
+export function morningBriefTemplate(data: MorningBriefData): string {
+  const outOfRange = data.positions?.filter((p) => p.inRange === false).length ?? 0;
+  return [
+    `- Portfolio: ${usd(data.totalUsd)}${data.change24hPct ? ` (${data.change24hPct}% in 24 h)` : ''}.`,
+    ...(data.ethPriceUsd ? [`- ETH: ${usd(data.ethPriceUsd)}.`] : []),
+    ...(data.risk
+      ? [`- Risk: ${data.risk.label}${data.risk.drivers[0] ? ` (${data.risk.drivers[0]})` : ''}.`]
+      : []),
+    ...(outOfRange
+      ? [
+          outOfRange === 1
+            ? '- One LP position is out of range.'
+            : `- ${outOfRange} LP positions are out of range.`,
+        ]
+      : []),
+    ...(data.newHooks ?? []).slice(0, 1).map((h) => `- New Safe hook: ${h}.`),
+    ...(data.alerts ?? []).slice(0, 2).map((a) => `- ${a}`),
+    ...(data.suggestions ?? []).slice(0, 2).map((s) => `- ${s}`),
+    ...(data.triggers?.length ? [`- ${data.triggers.length} active rule(s).`] : []),
+  ]
+    .slice(0, 6)
+    .join('\n');
+}
+
 export class Explainer {
   constructor(
     private client: ZgClient,
@@ -107,6 +159,16 @@ export class Explainer {
     fallback: string,
     traceKind: 'plan' | 'guard' = 'plan',
   ): Promise<string> {
+    return (await this.explainDetailed(name, data, fallback, traceKind)).text;
+  }
+
+  /** Like explain(), plus which 0G inference wrote the text (null = the template fallback). */
+  private async explainDetailed(
+    name: PromptName,
+    data: unknown,
+    fallback: string,
+    traceKind: 'plan' | 'guard' = 'plan',
+  ): Promise<{ text: string; inferenceId: string | null }> {
     try {
       const result = await this.client.chat({
         ...this.ctx,
@@ -125,9 +187,11 @@ export class Explainer {
       });
       const content = ResponseSchema.parse(result.data).choices[0]!.message.content;
       const text = clean(content ?? '');
-      return text && CHECKS[name](text) ? text : fallback;
+      return text && CHECKS[name](text)
+        ? { text, inferenceId: result.inferenceId }
+        : { text: fallback, inferenceId: null };
     } catch {
-      return fallback;
+      return { text: fallback, inferenceId: null };
     }
   }
 
@@ -141,9 +205,17 @@ export class Explainer {
   }
 
   explainHook(score: HookScore, facts: Facts = {}): Promise<string> {
+    return this.explainHookDetailed(score, facts).then((r) => r.text);
+  }
+
+  /** Hook explanation plus the inference that wrote it (hook indexer, PHASE 07). */
+  explainHookDetailed(
+    score: HookScore,
+    facts: Facts = {},
+  ): Promise<{ text: string; inferenceId: string | null }> {
     const perms = score.enabledPermissions?.map((p) => p.flag) ?? [];
     const band = score.band.toLowerCase();
-    return this.explain(
+    return this.explainDetailed(
       'hook',
       { score, facts },
       [
@@ -154,28 +226,27 @@ export class Explainer {
     );
   }
 
-  explainSuggestion(event: DetectorEventSummary, plan: ActionIntent): Promise<string> {
-    return this.explain(
-      'suggestion',
-      { event, plan },
-      `${event.summary.replace(/[.!?]+$/, '')}. I suggest: ${plan.reason}`
-        .split(/\s+/)
-        .slice(0, 30)
-        .join(' '),
+  explainSuggestion(event: DetectorEventSummary, plan: ActionIntent | null): Promise<string> {
+    return this.explainSuggestionDetailed(event, plan).then((r) => r.text);
+  }
+
+  /** The suggestion message plus the inference that wrote it (Mode B, PHASE 08). */
+  explainSuggestionDetailed(
+    event: DetectorEventSummary,
+    plan: ActionIntent | null,
+  ): Promise<ExplainedText> {
+    const fallback = suggestionTemplate(event, plan);
+    return this.explainDetailed('suggestion', { event, plan }, fallback).then((r) =>
+      misleadsTheHuman(r.text, plan) ? { text: fallback, inferenceId: null } : r,
     );
   }
 
   morningBrief(data: MorningBriefData): Promise<string> {
-    const bullets = [
-      `- Portfolio: ${usd(data.totalUsd)}${data.change24hPct ? ` (${data.change24hPct}% in 24 h)` : ''}.`,
-      ...(data.ethPriceUsd ? [`- ETH: ${usd(data.ethPriceUsd)}.`] : []),
-      ...(data.positions?.some((p) => p.inRange === false)
-        ? ['- One or more LP positions are out of range.']
-        : []),
-      ...(data.alerts ?? []).slice(0, 2).map((a) => `- ${a}`),
-      ...(data.suggestions ?? []).slice(0, 1).map((s) => `- ${s}`),
-    ].slice(0, 6);
-    return this.explain('morning', data, bullets.join('\n'));
+    return this.morningBriefDetailed(data).then((r) => r.text);
+  }
+
+  morningBriefDetailed(data: MorningBriefData): Promise<ExplainedText> {
+    return this.explainDetailed('morning', data, morningBriefTemplate(data));
   }
 
   explainPoolPick(comparison: PoolComparison): Promise<string> {

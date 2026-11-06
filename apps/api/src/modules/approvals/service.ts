@@ -36,6 +36,8 @@ export interface ApprovalsDeps {
   trace: Pick<TraceBus, 'emit'>;
   jobs: JobQueues;
   ttlSeconds: number;
+  /** Called after an approval left PENDING (Mode B: suggestion status, Telegram). */
+  onResolved?: (approval: Approval, outcome: ApprovalOutcome) => Promise<void>;
   now?: () => Date;
 }
 
@@ -189,6 +191,7 @@ export class ApprovalsService {
       // Proof the agent did not act, and why.
       await this.deps.jobs.enqueueDecisionLog(existing.actionPlanId);
     }
+    await this.deps.onResolved?.(approval, final).catch(() => undefined);
     return { changed: true, status: final, approval };
   }
 

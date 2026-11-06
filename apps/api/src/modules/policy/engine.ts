@@ -7,8 +7,12 @@
  *   3. STEP_UP — over the per-action or per-day limit (exactly at the limit is allowed), or the
  *                value could not be priced.
  *   4. STEP_UP — Caution hook (unless the profile allows it), trade score < minTradeScoreAuto.
- *   5. ASK     — a Mode B suggestion that would need the human and was not accepted yet.
+ *   5. ASK     — a Mode B suggestion that would need the human and was not accepted yet, or
+ *                whose detector is not allowed to act alone.
  *   6. AUTO.
+ * Leaving a hook pool (lp_exit) reduces the very risk rules 1 and 4 guard against, so a Danger
+ * hook or the score it drags down must never trap the human in the pool: the exit asks for them
+ * instead of being refused. Every other refusal (simulation, guard, unsupported token) stands.
  * Every reason carries a plain-English message plus the measured value and the limit.
  */
 import {
@@ -26,6 +30,10 @@ export interface PolicyInput {
   origin: 'user' | 'proactive';
   /** Mode B only: the human already said "Yes" to the suggestion. */
   proactiveAccepted?: boolean;
+  /** Mode B only: false keeps even a clean action waiting for the human's yes. */
+  proactiveAutoAllowed?: boolean;
+  /** The action exits a position in a hook pool. */
+  leavingHookPool?: boolean;
   buildError?: string | null;
   simulation: { ok: boolean; unavailable?: boolean; error?: string | null } | null;
   /** REFUSE facts from the trade score (unsupported/illiquid tokens, price impact). */
@@ -80,7 +88,7 @@ function refuseReasons(input: PolicyInput): PolicyReason[] {
         message: `The simulation failed${input.simulation.error ? `: ${input.simulation.error}` : ''}`,
       });
   }
-  if (input.hook?.band === 'DANGER')
+  if (input.hook?.band === 'DANGER' && !input.leavingHookPool)
     out.push({
       code: 'DANGER_HOOK',
       message: `The pool hook is rated Danger (${input.hook.score}/100)`,
@@ -91,7 +99,11 @@ function refuseReasons(input: PolicyInput): PolicyReason[] {
     out.push({ code: 'GUARD_UNAVAILABLE', message: 'Safety check unavailable' });
   else if (input.guard.verdict === 'block')
     out.push({ code: 'GUARD_BLOCKED', message: input.guard.reason });
-  if (input.tradeScore !== null && input.tradeScore < POLICY_REFUSE.minTradeScore)
+  if (
+    input.tradeScore !== null &&
+    input.tradeScore < POLICY_REFUSE.minTradeScore &&
+    !input.leavingHookPool
+  )
     out.push({
       code: 'TRADE_SCORE_TOO_LOW',
       message: `Trade safety score ${input.tradeScore}/100 is below ${POLICY_REFUSE.minTradeScore}`,
@@ -161,6 +173,13 @@ function stepUpReasons(input: PolicyInput): PolicyReason[] {
   if (limits.length) return limits; // rule 3 matched
 
   const quality: PolicyReason[] = [];
+  if (input.hook?.band === 'DANGER' && input.leavingHookPool)
+    quality.push({
+      code: 'DANGER_HOOK',
+      message: `Leaving a pool whose hook is rated Danger (${input.hook.score}/100) needs you`,
+      value: input.hook.score,
+      limit: 50,
+    });
   if (
     input.hook?.band === 'CAUTION' &&
     !hookAllowedWithoutApproval('CAUTION', input.limits.hookPolicy)
@@ -200,5 +219,19 @@ export function decide(input: PolicyInput): PolicyDecision {
       };
     return { outcome: 'STEP_UP', reasons: stepUp };
   }
+  if (
+    input.origin === 'proactive' &&
+    !input.proactiveAccepted &&
+    input.proactiveAutoAllowed === false
+  )
+    return {
+      outcome: 'ASK',
+      reasons: [
+        {
+          code: 'PROACTIVE_NEEDS_ACCEPTANCE',
+          message: 'Your agent suggests this; it needs your yes first',
+        },
+      ],
+    };
   return { outcome: 'AUTO', reasons: [] };
 }

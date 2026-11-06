@@ -27,7 +27,12 @@ import {
   type TokenInfo,
   type TxStep,
 } from '../schemas.js';
-import { fetchClassicQuote, normalizeQuote, type ClassicQuoteParams } from '../services/quote.js';
+import {
+  fetchBestClassicQuote,
+  normalizeQuote,
+  type ClassicQuoteParams,
+  type QuoteImpact,
+} from '../services/quote.js';
 import { normalizePermit } from '../services/typedData.js';
 import { validateTx } from '../tx.js';
 import { defineTool, short } from './define.js';
@@ -69,8 +74,9 @@ function swapSummary(
   params: ClassicQuoteParams,
   response: QuoteResponse,
   quote: ClassicQuote,
+  impact: QuoteImpact,
 ): BuildSummary {
-  const q = normalizeQuote(deps, params, response, quote);
+  const q = normalizeQuote(deps, params, response, quote, impact);
   const single = q.route.pools.length === 1 ? q.route.pools[0] : undefined;
   return {
     tokenIn: q.tokenIn,
@@ -80,6 +86,8 @@ function swapSummary(
     ...(q.minAmountOut ? { minAmountOut: q.minAmountOut } : {}),
     ...(q.maxAmountIn ? { maxAmountIn: q.maxAmountIn } : {}),
     ...(q.priceImpactPct !== null ? { priceImpactPct: q.priceImpactPct } : {}),
+    ...(impact.apiPct !== null ? { apiPriceImpactPct: impact.apiPct } : {}),
+    priceImpactMethod: impact.method,
     ...(q.gasFee.wei ? { gasEstimateWei: q.gasFee.wei } : {}),
     ...(q.gasFee.usd ? { gasFeeUsd: q.gasFee.usd } : {}),
     ...(q.route.summary ? { route: q.route.summary } : {}),
@@ -157,8 +165,9 @@ export const buildSwapTool = defineTool({
       args.type === 'EXACT_INPUT'
         ? await approvalSteps(deps, chainId, swapper, tokenIn, params.amountRaw)
         : [];
-    const { response, quote } = await fetchClassicQuote(deps, params);
-    const summary = swapSummary(deps, params, response, quote);
+    // Junk-split protection: may re-quote on one protocol; /swap uses whichever quote is kept.
+    const { response, quote, impact } = await fetchBestClassicQuote(deps, params);
+    const summary = swapSummary(deps, params, response, quote, impact);
     if (args.type === 'EXACT_OUTPUT') {
       // Exact output: approve the maximum input after slippage, known only after quoting.
       const maxIn = BigInt(summary.maxAmountIn?.raw ?? summary.amountIn?.raw ?? '0');

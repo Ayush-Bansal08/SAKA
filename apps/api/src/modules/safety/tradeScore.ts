@@ -19,7 +19,10 @@ export interface TokenCheckFact {
 }
 
 export interface TradeScoreInput {
+  /** Effective impact of the whole quote vs the deepest direct pool's mid price. */
   priceImpactPct: number | null;
+  /** The Uniswap API's raw `priceImpact` — evidence only, never scored. */
+  apiPriceImpactPct?: number | null;
   amountUsd: Decimal | null;
   portfolioUsd: Decimal | null;
   /** check_token result for every non-native token involved. */
@@ -48,6 +51,17 @@ const pct = (d: Decimal) => d.toDecimalPlaces(2).toString();
 const tokenName = (t: TokenCheckFact) =>
   t.symbol ?? `${t.address.slice(0, 6)}…${t.address.slice(-4)}`;
 
+/**
+ * The Uniswap API's own figure, shown next to ours when it differs: on thin testnets a split
+ * through a mispriced pool can make it report ~96% for a quote that is actually the best one.
+ */
+function apiImpactNote(api: number | null | undefined, ours: Decimal): string {
+  if (api === null || api === undefined) return '';
+  const a = new Decimal(api);
+  if (a.minus(ours).abs().lt(0.01)) return '';
+  return `; effective price vs the main pool — the Uniswap API reported ${pct(a)}%`;
+}
+
 export function tradeScore(input: TradeScoreInput): TradeScoreResult {
   const breakdown: TradeScoreItem[] = [];
   const refuse: PolicyReason[] = [];
@@ -63,7 +77,7 @@ export function tradeScore(input: TradeScoreInput): TradeScoreResult {
       'price_impact',
       // Capped at the whole score so the breakdown stays readable for extreme impacts.
       Math.min(steps * T.priceImpact.penaltyPerStep, T.max),
-      `Price impact ${pct(impact)}%${steps ? ` (${steps} × 0.5% above ${T.priceImpact.freeBelowPct}%)` : ''}`,
+      `Price impact ${pct(impact)}%${steps ? ` (${steps} × 0.5% above ${T.priceImpact.freeBelowPct}%)` : ''}${apiImpactNote(input.apiPriceImpactPct, impact)}`,
     );
     if (impact.gt(T.priceImpact.refuseAbovePct))
       refuse.push({

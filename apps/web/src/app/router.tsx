@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import { ActivityPage } from '@/pages/ActivityPage';
 import { ApprovalPage } from '@/pages/ApprovalPage';
 import { CockpitPage } from '@/pages/CockpitPage';
+import { HookDetailPage } from '@/pages/HookDetailPage';
 import { HooksPage } from '@/pages/HooksPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <CockpitPage /> },
       { path: 'hooks', element: <HooksPage /> },
+      { path: 'hooks/:chainId/:address', element: <HookDetailPage /> },
       { path: 'inbox', element: <InboxPage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'settings', element: <SettingsPage /> },

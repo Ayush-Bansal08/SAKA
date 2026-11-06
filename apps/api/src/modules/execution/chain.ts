@@ -43,6 +43,8 @@ export interface ChainClient {
   /** Resolves null on timeout (the caller re-checks by hash; it never re-broadcasts). */
   waitForReceipt(hash: `0x${string}`, timeoutMs: number): Promise<ChainReceipt | null>;
   getReceipt(hash: `0x${string}`): Promise<ChainReceipt | null>;
+  /** Current gas price in wei (Mode B payback maths). */
+  gasPrice?(): Promise<bigint>;
 }
 
 export class SimulationRevert extends Error {
@@ -116,6 +118,9 @@ export function createChainClient(
         if (err instanceof WaitForTransactionReceiptTimeoutError) return null;
         throw err;
       }
+    },
+    gasPrice() {
+      return client.getGasPrice();
     },
     async getReceipt(hash) {
       try {

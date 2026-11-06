@@ -1,14 +1,22 @@
 /**
  * GET /stream — Server-Sent Events for the authenticated user's trace events.
  * Auth is a Bearer header (the web uses @microsoft/fetch-event-source).
- * On connect: subscribe → replay the last 50 events → flush live events
+ * On connect: subscribe → replay the last TRACE_REPLAY_LIMIT (150) events → flush live events
  * (de-duplicated by id), so nothing emitted during the replay is lost.
+ *
+ * GET /traces/:traceId/events — every event of one run, oldest first (plan drawer timeline).
+ * Owner only: another human's trace id returns an empty list, never their events.
  */
 import { randomUUID } from 'node:crypto';
 import type { OutgoingHttpHeaders } from 'node:http';
-import { TRACE_REPLAY_LIMIT, type TraceEvent } from '@warden/shared';
+import { TRACE_REPLAY_LIMIT, type TraceEvent, type TraceEventsResponse } from '@warden/shared';
+import { z } from 'zod';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { authOf, requireUser } from '../auth/require-user.js';
+import { rowToEvent } from './trace-bus.js';
+
+/** Upper bound of one run's timeline (a rebalance with retries stays well below it). */
+export const TRACE_EVENTS_MAX = 500;
 
 export const SSE_HEARTBEAT_MS = 15_000;
 /** Presence window: "Agent online" is emitted when a user connects after this long away. */
@@ -115,4 +123,20 @@ export const traceRoutes: FastifyPluginAsyncZod = async (app) => {
       end();
     }
   });
+
+  app.get(
+    '/traces/:traceId/events',
+    {
+      preHandler: requireUser,
+      schema: { params: z.object({ traceId: z.string().min(1).max(100) }) },
+    },
+    async (request): Promise<TraceEventsResponse> => {
+      const rows = await app.deps.prisma.traceEventRow.findMany({
+        where: { traceId: request.params.traceId, userId: authOf(request).user.id },
+        orderBy: { ts: 'asc' },
+        take: TRACE_EVENTS_MAX,
+      });
+      return { traceId: request.params.traceId, events: rows.map(rowToEvent) };
+    },
+  );
 };

@@ -11,6 +11,13 @@ import type { ToolDeps } from '../context.js';
 import { McpToolError } from '../errors.js';
 import { isZeroHook } from '../hooks/permissions.js';
 import type { GetQuoteOutput, TokenInfo } from '../schemas.js';
+import {
+  computePriceImpact,
+  mainPool,
+  REQUOTE_ABOVE_IMPACT_PCT,
+  type PriceImpact,
+  type RouteProtocol,
+} from './priceImpact.js';
 
 /** Quotes go stale fast (skill "Quote Freshness": typically 30 s). */
 export const QUOTE_FRESHNESS_MS = 30_000;
@@ -26,6 +33,8 @@ export interface ClassicQuoteParams {
   swapper: Address;
   slippagePct?: number;
   recipient?: Address;
+  /** Restrict routing to these protocols (default V2/V3/V4 — always CLASSIC). */
+  protocols?: RouteProtocol[];
 }
 
 /** Slippage: percentage with at most two decimals (spec `slippageTolerance` pattern). */
@@ -47,7 +56,7 @@ export function buildQuoteRequest(p: ClassicQuoteParams): QuoteRequest {
     tokenIn: p.tokenIn.address,
     tokenOut: p.tokenOut.address,
     swapper: p.swapper,
-    protocols: ['V2', 'V3', 'V4'],
+    protocols: p.protocols?.length ? [...p.protocols] : ['V2', 'V3', 'V4'],
     routingPreference: 'BEST_PRICE',
   };
   if (p.slippagePct !== undefined) request.slippageTolerance = normalizeSlippage(p.slippagePct);
@@ -74,6 +83,140 @@ export async function fetchClassicQuote(
     );
   }
   return { response, quote: response.quote as ClassicQuote };
+}
+
+/** Price impact of the kept quote, plus what the single-protocol re-quote did. */
+export interface QuoteImpact extends PriceImpact {
+  requote: { protocol: RouteProtocol; kept: 'original' | 'single_protocol' } | null;
+}
+
+/** Gas cost in the quoted currency's base units (0 when the API did not say). */
+export function gasInQuoted(quote: Pick<ClassicQuote, 'gasFeeQuote'>): bigint {
+  const g = (quote as { gasFeeQuote?: unknown }).gasFeeQuote;
+  return typeof g === 'string' && /^\d+$/.test(g) ? BigInt(g) : 0n;
+}
+
+function totals(p: ClassicQuoteParams, quote: ClassicQuote): { inRaw: bigint; outRaw: bigint } {
+  return {
+    inRaw: BigInt(quote.input?.amount ?? (p.type === 'EXACT_INPUT' ? p.amountRaw : 0n)),
+    outRaw: BigInt(quote.output?.amount ?? (p.type === 'EXACT_OUTPUT' ? p.amountRaw : 0n)),
+  };
+}
+
+const usesPool = (quote: ClassicQuote, pools: ReadonlySet<string>) =>
+  (quote.route as { address?: string }[][] | undefined)?.some((path) =>
+    path.some((hop) => pools.has((hop.address ?? '').toLowerCase())),
+  ) ?? false;
+
+/**
+ * Execution-chain routing with a known-bad pool list. Testnet routers favour pools that quote well
+ * and then revert, or junk multi-hops, and which side is healthy differs by direction, so no
+ * single protocol is right. Each protocol is quoted on its own: blocked pools are dropped, a route
+ * within REQUOTE_ABOVE_IMPACT_PCT of its mid beats one that is not, and among equals the better
+ * price wins. A real loss is not hidden: with only bad routes left, the policy still sees it.
+ */
+async function fetchCleanestClassicQuote(
+  deps: ToolDeps,
+  p: ClassicQuoteParams,
+  options: { cache?: boolean },
+  blocked: ReadonlySet<string>,
+): Promise<{ response: QuoteResponse; quote: ClassicQuote; impact: QuoteImpact }> {
+  const attempts = await Promise.allSettled(
+    (['V3', 'V4'] as const).map(async (protocol) => {
+      const got = await fetchClassicQuote(deps, { ...p, protocols: [protocol] }, options);
+      const t = totals(p, got.quote);
+      const impact = computePriceImpact(got.quote, t.inRaw, t.outRaw, mainPool([got.quote.route]));
+      return { ...got, protocol, impact, totals: t };
+    }),
+  );
+  const usable = attempts.flatMap((a) =>
+    a.status === 'fulfilled' && !usesPool(a.value.quote, blocked) ? [a.value] : [],
+  );
+  const clean = (c: (typeof usable)[number]) =>
+    c.impact.pct !== null && c.impact.pct <= REQUOTE_ABOVE_IMPACT_PCT;
+  const better = (a: (typeof usable)[number], b: (typeof usable)[number]) =>
+    p.type === 'EXACT_INPUT' ? a.totals.outRaw > b.totals.outRaw : a.totals.inRaw < b.totals.inRaw;
+  const best = usable.reduce<(typeof usable)[number] | null>((kept, c) => {
+    if (!kept) return c;
+    if (clean(c) !== clean(kept)) return clean(c) ? c : kept;
+    return better(c, kept) ? c : kept;
+  }, null);
+  if (!best)
+    throw new McpToolError('NO_ROUTE', 'No usable route for this swap on the execution chain.', {
+      retryable: true,
+    });
+  return {
+    response: best.response,
+    quote: best.quote,
+    impact: { ...best.impact, requote: { protocol: best.protocol, kept: 'single_protocol' } },
+  };
+}
+
+/**
+ * Quote with junk-split protection (see services/priceImpact.ts). When the effective price is
+ * more than REQUOTE_ABOVE_IMPACT_PCT worse than the deepest direct pool's mid price, quote again
+ * restricted to that pool's protocol and keep whichever is better for the user (exact input:
+ * more output; exact output: less input). Both quotes are measured against the same reference
+ * mid (deepest direct pool seen in either route). A failed re-quote keeps the original. A real
+ * loss is not hidden: the kept quote's effective impact is what the policy sees (> 5% refuses).
+ */
+export async function fetchBestClassicQuote(
+  deps: ToolDeps,
+  p: ClassicQuoteParams,
+  options: { cache?: boolean } = {},
+): Promise<{ response: QuoteResponse; quote: ClassicQuote; impact: QuoteImpact }> {
+  const blocked = deps.config.UNISWAP_BLOCKED_POOLS;
+  if (blocked?.length && p.chainId === deps.executionChainId && !p.protocols?.length)
+    return fetchCleanestClassicQuote(deps, p, options, new Set(blocked));
+  const first = await fetchClassicQuote(deps, p, options);
+  const firstTotals = totals(p, first.quote);
+  const ref = mainPool([first.quote.route]);
+  const firstImpact = computePriceImpact(first.quote, firstTotals.inRaw, firstTotals.outRaw, ref);
+  if (
+    !ref ||
+    p.protocols?.length ||
+    firstImpact.pct === null ||
+    firstImpact.pct <= REQUOTE_ABOVE_IMPACT_PCT
+  )
+    return { ...first, impact: { ...firstImpact, requote: null } };
+
+  let second: Awaited<ReturnType<typeof fetchClassicQuote>> | null = null;
+  try {
+    second = await fetchClassicQuote(deps, { ...p, protocols: [ref.protocol] }, options);
+  } catch (err) {
+    deps.log.warn('single-protocol re-quote failed; keeping the original quote', {
+      err: err instanceof Error ? err.message : String(err),
+      protocol: ref.protocol,
+    });
+  }
+  if (!second)
+    return {
+      ...first,
+      impact: { ...firstImpact, requote: { protocol: ref.protocol, kept: 'original' } },
+    };
+
+  const secondTotals = totals(p, second.quote);
+  const reference = mainPool([first.quote.route, second.quote.route]) ?? ref;
+  // Better for the user NET OF GAS: gasFeeQuote is the gas cost in the quoted currency (output
+  // token for exact input, input token for exact output), so a route that returns slightly more
+  // but burns more gas does not win.
+  const better =
+    p.type === 'EXACT_INPUT'
+      ? secondTotals.outRaw - gasInQuoted(second.quote) >
+        firstTotals.outRaw - gasInQuoted(first.quote)
+      : secondTotals.inRaw > 0n &&
+        secondTotals.inRaw + gasInQuoted(second.quote) <
+          firstTotals.inRaw + gasInQuoted(first.quote);
+  const kept = better ? second : first;
+  const keptTotals = better ? secondTotals : firstTotals;
+  const impact = computePriceImpact(kept.quote, keptTotals.inRaw, keptTotals.outRaw, reference);
+  return {
+    ...kept,
+    impact: {
+      ...impact,
+      requote: { protocol: ref.protocol, kept: better ? 'single_protocol' : 'original' },
+    },
+  };
 }
 
 type RouteHop = NonNullable<ClassicQuote['route']>[number][number];
@@ -119,6 +262,7 @@ export function normalizeQuote(
   p: ClassicQuoteParams,
   response: QuoteResponse,
   quote: ClassicQuote,
+  impact?: QuoteImpact,
 ): GetQuoteOutput {
   const amountInRaw = BigInt(quote.input?.amount ?? (p.type === 'EXACT_INPUT' ? p.amountRaw : 0n));
   const amountOutRaw = BigInt(
@@ -141,6 +285,10 @@ export function normalizeQuote(
     if (value !== null) maxAmountIn = amountOf(value, p.tokenIn.decimals);
   }
 
+  const pi: QuoteImpact = impact ?? {
+    ...computePriceImpact(quote, amountInRaw, amountOutRaw),
+    requote: null,
+  };
   const now = deps.now();
   return {
     chainId: p.chainId,
@@ -155,7 +303,13 @@ export function normalizeQuote(
     minAmountOut,
     maxAmountIn,
     slippagePct: slippage,
-    priceImpactPct: typeof quote.priceImpact === 'number' ? quote.priceImpact : null,
+    priceImpactPct: pi.pct,
+    priceImpactDetail: {
+      method: pi.method,
+      apiPct: pi.apiPct,
+      referencePool: pi.referencePool,
+      requote: pi.requote,
+    },
     gasFee: {
       wei: quote.gasFee && /^\d+$/.test(quote.gasFee) ? quote.gasFee : null,
       usd: quote.gasFeeUSD ?? null,

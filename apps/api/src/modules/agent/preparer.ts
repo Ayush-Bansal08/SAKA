@@ -14,6 +14,8 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import {
+  type RangePreset,
+  type RiskProfile,
   Decimal,
   NATIVE_TOKEN_ADDRESS,
   type ActionIntent,
@@ -59,7 +61,10 @@ export interface StoredSteps {
   /** Non-native tokens to run check_token on. */
   tokenChecks: string[];
   slippagePct: number | null;
+  /** Effective impact vs the deepest direct pool's mid (MCP priceImpactMethod). */
   priceImpactPct: number | null;
+  /** The Uniswap API's raw `priceImpact`, kept as evidence (absent on plans made before it). */
+  apiPriceImpactPct?: number | null;
   gasUsd: string | null;
   hookAddress: string | null;
   poolRef: string | null;
@@ -108,7 +113,15 @@ export interface PrepareAccount {
   userId: string;
   wallet: `0x${string}`;
   maxSlippagePct: number;
+  /** LP range when the user named none (PHASE 07): careful → wide, balanced → medium, adventurous → narrow. */
+  riskProfile?: RiskProfile;
 }
+
+export const PROFILE_RANGE: Record<RiskProfile, RangePreset> = {
+  CAREFUL: 'wide',
+  BALANCED: 'balanced',
+  ADVENTUROUS: 'narrow',
+};
 
 export class PrepareError extends Error {
   override name = 'PrepareError';
@@ -198,6 +211,7 @@ async function runBuild(
     }
     if (out.next) stored.next = { tool: 'build_lp_position', args: out.next.args };
     stored.priceImpactPct = out.summary.priceImpactPct ?? null;
+    stored.apiPriceImpactPct = out.summary.apiPriceImpactPct ?? null;
     stored.gasUsd = out.summary.gasFeeUsd ?? null;
     stored.hookAddress = out.summary.hookAddress ?? stored.hookAddress;
     stored.poolRef = out.summary.poolRef ?? stored.poolRef;
@@ -239,6 +253,8 @@ export async function prepare(
   account: PrepareAccount,
   intent: ActionIntent,
 ): Promise<Prepared> {
+  const rangeOf = (p: RangePreset | undefined): RangePreset =>
+    p ?? PROFILE_RANGE[account.riskProfile ?? 'BALANCED'];
   const chainId = deps.chainId;
   const slippage = (s?: number) => Math.min(s ?? account.maxSlippagePct, 50);
 
@@ -330,6 +346,35 @@ export async function prepare(
         hookAddress = pick.hookAddress;
         pair = [comparison.tokenA, comparison.tokenB];
       }
+      if (!pair) {
+        // Pool chosen by the planner: resolve both tokens here (ordering and USD pricing need
+        // real addresses, not symbols).
+        const registry = executionTokens(chainId, deps.allowlist);
+        const resolve = (t: TokenRef) =>
+          t.address
+            ? findToken(registry, t.address)
+            : registry.find((x) => x.symbol.toUpperCase() === t.symbol?.toUpperCase());
+        const a = resolve(intent.token0);
+        const b = resolve(intent.token1);
+        if (!a || !b)
+          throw new PrepareError(
+            `Unknown token in this pair (${intent.token0.symbol ?? intent.token0.address}/${intent.token1.symbol ?? intent.token1.address}).`,
+          );
+        pair = [
+          {
+            address: getAddress(a.address),
+            symbol: a.symbol,
+            decimals: a.decimals,
+            isNative: a.isNative,
+          },
+          {
+            address: getAddress(b.address),
+            symbol: b.symbol,
+            decimals: b.decimals,
+            isNative: b.isNative,
+          },
+        ];
+      }
       // build_lp_position wants token0/token1 in currency order (lower address first).
       const refs = [tokenArg(intent.token0), tokenArg(intent.token1)];
       const ordered = pair
@@ -370,7 +415,7 @@ export async function prepare(
             owner: account.wallet,
             pool: { poolReference: poolId as `0x${string}`, token0: t0!, token1: t1! },
             independentToken: independent,
-            range: { preset: RANGE_PRESET[intent.rangePreset] },
+            range: { preset: RANGE_PRESET[rangeOf(intent.rangePreset)] },
             slippagePct,
           },
         },
@@ -380,7 +425,7 @@ export async function prepare(
           poolRef: poolId,
           hookAddress:
             hookAddress && hookAddress.toLowerCase() !== ZERO ? getAddress(hookAddress) : null,
-          ...(intent.rangePreset === 'full'
+          ...(rangeOf(intent.rangePreset) === 'full'
             ? { warnings: ['Full range is opened as the widest preset (±40%).'] }
             : {}),
         },
@@ -427,15 +472,18 @@ export async function prepare(
                 tool: 'build_rebalance',
                 args: {
                   ...base,
-                  poolReference: position.poolId as `0x${string}`,
-                  newRange: { preset: RANGE_PRESET[intent.rangePreset] },
+                  poolReference: (intent.targetPool?.poolId ?? position.poolId) as `0x${string}`,
+                  newRange: { preset: RANGE_PRESET[rangeOf(intent.rangePreset)] },
                   slippagePct,
                 },
               },
               {
                 lpPositionId: position.id,
-                poolRef: position.poolId,
-                hookAddress: position.hookAddress,
+                poolRef: intent.targetPool?.poolId ?? position.poolId,
+                // The hook gate judges where the money is going, not where it comes from.
+                hookAddress: intent.targetPool
+                  ? (intent.targetPool.hookAddress ?? null)
+                  : position.hookAddress,
                 slippagePct,
               },
             );
@@ -482,9 +530,15 @@ export async function prepare(
           const amountIn = tokenAmount(s.tokenIn, s.amountIn, priceIn);
           const amountOut = tokenAmount(s.tokenOut, s.amountOut, priceOut);
           if (!amountIn || !amountOut) return null;
+          const gas = s.gasFeeUsd ? new Decimal(s.gasFeeUsd) : null;
+          const net =
+            amountOut.usd && gas
+              ? Decimal.max(0, new Decimal(amountOut.usd).minus(gas)).toDecimalPlaces(2)
+              : null;
           return {
             amountIn,
             amountOut,
+            ...(net ? { netOutUsd: net.toFixed(2) } : {}),
             priceImpactPct: Math.max(0, s.priceImpactPct ?? 0),
             ...(s.gasFeeUsd
               ? { gasUsd: new Decimal(s.gasFeeUsd).toDecimalPlaces(2).toFixed(2) }

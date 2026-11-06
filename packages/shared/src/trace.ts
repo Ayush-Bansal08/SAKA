@@ -89,7 +89,7 @@ export function parseTraceEvent(value: unknown): TraceEvent {
 }
 
 /** Number of recent events replayed to a client when it (re)connects. */
-export const TRACE_REPLAY_LIMIT = 50;
+export const TRACE_REPLAY_LIMIT = 150;
 
 export function traceChannel(userId: string): string {
   return `trace:${userId}`;

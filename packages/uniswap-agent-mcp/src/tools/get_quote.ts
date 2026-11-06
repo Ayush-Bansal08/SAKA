@@ -6,7 +6,11 @@ import { toRaw } from '../amounts.js';
 import { requireReadableChain } from '../context.js';
 import { invalidInput } from '../errors.js';
 import { GetQuoteInputSchema, GetQuoteOutputSchema } from '../schemas.js';
-import { fetchClassicQuote, normalizeQuote, type ClassicQuoteParams } from '../services/quote.js';
+import {
+  fetchBestClassicQuote,
+  normalizeQuote,
+  type ClassicQuoteParams,
+} from '../services/quote.js';
 import { defineTool } from './define.js';
 
 export const getQuoteTool = defineTool({
@@ -35,8 +39,10 @@ export const getQuoteTool = defineTool({
       swapper: args.swapper as `0x${string}`,
       ...(args.slippagePct !== undefined ? { slippagePct: args.slippagePct } : {}),
     };
-    const { response, quote } = await fetchClassicQuote(deps, params, { cache: true });
-    return normalizeQuote(deps, params, response, quote);
+    const { response, quote, impact } = await fetchBestClassicQuote(deps, params, {
+      cache: true,
+    });
+    return normalizeQuote(deps, params, response, quote, impact);
   },
   summarize(o) {
     const impact = o.priceImpactPct !== null ? `${o.priceImpactPct}% impact` : 'impact n/a';

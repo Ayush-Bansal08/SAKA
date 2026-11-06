@@ -1,218 +1,479 @@
+/**
+ * Agent chat (PHASE 06 §2): date separators, auto-scroll with a "new messages" pill, optimistic
+ * user message, "Agent is thinking… · <current step>" from the live trace, multiline composer
+ * (Enter sends, Shift+Enter newline, 500 chars), quick-action chips, example cards, and cards that
+ * update in place from SSE. Long histories stay cheap with `content-visibility: auto`.
+ */
+import type { UserView } from '@warden/shared';
 import {
-  AGENT_MESSAGE_MAX_CHARS,
-  type AgentMessageView,
-  type UserView,
-  type ZgProvenance,
-} from '@warden/shared';
-import { BadgeCheck, Bot, Loader2, MessageSquareText, SendHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+  ArrowDown,
+  ArrowLeftRight,
+  Blocks,
+  Bot,
+  Droplets,
+  Loader2,
+  PieChart,
+  SendHorizontal,
+  ShieldCheck,
+  Target,
+  Trophy,
+} from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import type * as React from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  AgentBadge,
-  Badge,
-  EmptyState,
-  ErrorState,
-  HashChip,
-  Panel,
-  SkeletonRows,
-} from '@/components/ui-kit';
+import { AgentBadge, ErrorState, Panel, SkeletonRows } from '@/components/ui-kit';
+import { useTraceStream } from '@/features/trace/trace-context';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { dayLabel } from './cards/card-utils';
+import { ZgChip } from './cards/parts';
+import { ComposerContext, type ComposerApi } from './composer-context';
+import { foldMessages, type FoldedMessage } from './fold';
+import { consumePrefill, subscribePrefill } from './prefill';
 import { isAwaitingReply, useAgentMessages, useSendAgentMessage } from './hooks';
-import { parseCards } from './plan-hooks';
 import { PlanCards } from './PlanCards';
 
-const EXAMPLE_PROMPTS = [
-  'Swap $20 ETH to USDC',
-  'Put $100 into ETH/USDC',
-  'Is USDC safe?',
-  'Stop loss at $2,800',
-];
+const COMPOSER_MAX_CHARS = 500;
 
-/** 0G provenance and status of the first valid card on an agent message. */
-function cardMeta(message: AgentMessageView): {
-  zg?: ZgProvenance;
-  planned: boolean;
-  failed: boolean;
-} {
-  const cards = parseCards(message.cards);
-  // A bare intent card (no pipeline card after it) is a plan that was not prepared.
-  const pipeline = cards.some((c) => c.type !== 'intent' && c.type !== 'info');
-  for (const card of cards) {
-    const zg = 'zg' in card ? card.zg : undefined;
-    return {
-      ...(zg ? { zg } : {}),
-      planned: card.type === 'intent' && !pipeline,
-      failed: card.type === 'info' && card.title === 'Planning failed',
-    };
-  }
-  return { planned: false, failed: false };
-}
+const QUICK_ACTIONS = [
+  { label: 'Swap', icon: ArrowLeftRight, text: 'Swap $10 ETH to USDC' },
+  { label: 'Best pool', icon: Trophy, text: 'Best pool for ETH/USDC?' },
+  { label: 'Explain a hook', icon: Blocks, text: 'Explain this hook: 0x' },
+  { label: 'Portfolio', icon: PieChart, text: 'Show my portfolio' },
+  { label: 'Set take-profit', icon: Target, text: 'Sell half if ETH goes up 2%' },
+] as const;
 
-function MessageBubble({ message }: { message: AgentMessageView }) {
+const EXAMPLES = [
+  {
+    icon: ArrowLeftRight,
+    title: 'Swap',
+    text: 'Swap $5 ETH to USDC',
+    hint: 'Small and safe — your agent does it alone',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Safety check',
+    text: 'Is USDC safe?',
+    hint: 'Allowlist, Uniswap lists and liquidity',
+  },
+  {
+    icon: Droplets,
+    title: 'Liquidity',
+    text: 'Best pool for ETH/USDC?',
+    hint: 'Compares pools, hooks and fee APR',
+  },
+  {
+    icon: Target,
+    title: 'Over your limit',
+    text: 'Swap $60 ETH to USDC',
+    hint: 'Watch it ask you first',
+  },
+] as const;
+
+function Bubble({ item, preparing }: { item: FoldedMessage; preparing: boolean }) {
+  const { message } = item;
   const mine = message.role === 'USER';
-  const meta = mine ? null : cardMeta(message);
+  const zg = mine
+    ? undefined
+    : item.cards.map((c) => ('zg' in c ? c.zg : undefined)).find((z) => z !== undefined);
   return (
-    <li className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+    <li
+      className={cn(
+        'flex [contain-intrinsic-size:auto_120px] [content-visibility:auto]',
+        mine ? 'justify-end' : 'justify-start',
+      )}
+    >
+      {!mine && (
+        <span
+          className="mt-0.5 mr-2 hidden size-7 shrink-0 items-center justify-center rounded-full border border-agent/30 bg-agent/10 text-agent sm:flex"
+          aria-hidden
+        >
+          <Bot className="size-3.5" />
+        </span>
+      )}
       <div
         className={cn(
-          'max-w-[92%] sm:max-w-[85%] rounded-lg border px-3.5 py-2.5 text-sm leading-relaxed',
+          'min-w-0 text-sm leading-relaxed',
           mine
-            ? 'border-transparent bg-primary text-primary-foreground'
-            : meta?.failed
-              ? 'border-danger/40 bg-surface-2'
-              : 'border-border bg-surface-2',
+            ? 'max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-primary-foreground'
+            : 'w-full max-w-[640px]',
         )}
       >
-        <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>
-        {!mine && <PlanCards cards={parseCards(message.cards)} />}
-        {meta && (meta.zg || meta.planned) && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {meta.planned && <Badge tone="info">Plan · not executed</Badge>}
-            {meta.zg && (
-              <>
-                <HashChip
-                  tone="zg"
-                  label="0G"
-                  value={meta.zg.requestId}
-                  icon={<BadgeCheck className="size-3" aria-hidden />}
-                />
-                <Badge tone="zg">{meta.zg.trustMode}</Badge>
-                {meta.zg.teeVerified && <Badge tone="safe">TEE verified</Badge>}
-              </>
-            )}
-          </div>
-        )}
+        <p className={cn('whitespace-pre-wrap [overflow-wrap:anywhere]', !mine && 'pt-0.5')}>
+          {message.text}
+        </p>
+        {!mine && <PlanCards cards={item.cards} preparing={preparing} />}
         <p
           className={cn(
-            'mt-1 text-[11px]',
-            mine ? 'text-primary-foreground/70' : 'text-subtle-foreground',
+            'mt-1.5 flex flex-wrap items-center gap-2 text-[11px]',
+            mine ? 'justify-end text-primary-foreground/70' : 'text-subtle-foreground',
           )}
         >
-          <time dateTime={message.createdAt}>{formatRelative(message.createdAt)}</time>
+          <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString()}>
+            {formatRelative(message.createdAt)}
+          </time>
+          {zg && <ZgChip zg={zg} />}
         </p>
       </div>
     </li>
   );
 }
 
+function useThinkingStep(traceId: string | null): string | null {
+  const { events } = useTraceStream();
+  return useMemo(() => {
+    if (!traceId) return null;
+    for (let i = events.length - 1; i >= 0; i--)
+      if (events[i]!.traceId === traceId) return events[i]!.title;
+    return null;
+  }, [events, traceId]);
+}
+
 export function AgentPanel({ user }: { user: UserView }) {
   const messagesQuery = useAgentMessages();
   const send = useSendAgentMessage();
   const [text, setText] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [optimistic, setOptimistic] = useState<{ text: string; at: number } | null>(null);
+  const [unseen, setUnseen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const nearBottom = useRef(true);
 
   // The API returns newest first; the chat reads top to bottom.
   const messages = useMemo(
     () => [...(messagesQuery.data?.messages ?? [])].reverse(),
     [messagesQuery.data],
   );
-  const planning = send.isPending || isAwaitingReply(messagesQuery.data);
+  const folded = useMemo(() => foldMessages(messages), [messages]);
+  const hasMessages = folded.length > 0;
+  const awaiting = isAwaitingReply(messagesQuery.data);
+  const planning = send.isPending || awaiting || optimistic !== null;
+  const pendingTraceId =
+    send.data?.traceId ?? (awaiting ? (messages[messages.length - 1]?.traceId ?? null) : null);
+  const step = useThinkingStep(planning ? pendingTraceId : null);
 
+  // Drop the optimistic bubble once the server copy is loaded.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, planning]);
+    if (!optimistic) return;
+    const landed = messages.some(
+      (m) =>
+        m.role === 'USER' &&
+        m.text === optimistic.text &&
+        Date.parse(m.createdAt) >= optimistic.at - 60_000,
+    );
+    if (landed) setOptimistic(null);
+  }, [messages, optimistic]);
 
-  const submit = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed || planning) return;
-    send.mutate(trimmed, { onSuccess: () => setText('') });
+  const scrollToEnd = useCallback((smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    setUnseen(false);
+  }, []);
+
+  const lastId = messages[messages.length - 1]?.id;
+  const lastCards = JSON.stringify(messagesQuery.data?.messages[0]?.cards ?? null);
+  useLayoutEffect(() => {
+    if (nearBottom.current) scrollToEnd();
+    else if (lastId) setUnseen(true);
+    // Card updates (countdown → receipt) also grow the list.
+  }, [lastId, lastCards, optimistic, planning, scrollToEnd]);
+
+  // Stay pinned to the bottom while content grows (lazy-rendered messages measuring in,
+  // a countdown turning into a receipt) — unless the human scrolled up to read.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (nearBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [messagesQuery.isPending, hasMessages]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+    if (nearBottom.current) setUnseen(false);
   };
 
+  const submit = (value: string) => {
+    const trimmed = value.trim().slice(0, COMPOSER_MAX_CHARS);
+    if (!trimmed || planning) return;
+    setOptimistic({ text: trimmed, at: Date.now() });
+    nearBottom.current = true;
+    setText('');
+    send.mutate(trimmed, {
+      onError: () => {
+        setOptimistic(null);
+        setText(trimmed);
+      },
+    });
+  };
+
+  const composer = useMemo<ComposerApi>(
+    () => ({
+      prefill(value: string) {
+        setText(value.slice(0, COMPOSER_MAX_CHARS));
+        requestAnimationFrame(() => {
+          const el = inputRef.current;
+          if (!el) return;
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        });
+      },
+    }),
+    [],
+  );
+
+  // Text sent from other views (hook cards, LP positions, rules).
+  useEffect(() => {
+    const sub = subscribePrefill((t) => {
+      composer.prefill(t);
+      consumePrefill();
+    });
+    if (sub.initial) composer.prefill(sub.initial);
+    return sub.unsubscribe;
+  }, [composer]);
+
+  // Auto-size the textarea (1–6 lines).
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 6 * 22 + 20)}px`;
+  }, [text]);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      submit(text);
+    }
+  };
+
+  let lastDay = '';
+  const visible = folded.filter((f) => !f.hidden);
+  const now = new Date();
+
   return (
-    <Panel
-      id="agent"
-      title="Agent"
-      subtitle="Plans on 0G · builds on Uniswap · you stay in control"
-      icon={<Bot />}
-      actions={<AgentBadge />}
-      bodyClassName="flex min-h-[360px] flex-col p-0"
-    >
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messagesQuery.isPending ? (
-          <SkeletonRows rows={3} />
-        ) : messagesQuery.isError ? (
-          <ErrorState
-            title="Couldn't load your conversation"
-            description={messagesQuery.error.message}
-            onRetry={() => void messagesQuery.refetch()}
-            retrying={messagesQuery.isFetching}
-          />
-        ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center py-6">
-            <EmptyState
-              className="py-0"
-              icon={<MessageSquareText />}
-              title={`Hi ${user.displayName ?? 'there'} — I'm your agent.`}
-              description="Ask me to swap, provide liquidity, set a stop-loss or check if a token is safe. I plan on 0G; nothing runs without passing the safety checks."
-            >
-              <ul
-                className="mt-5 flex max-w-md flex-wrap justify-center gap-2"
-                aria-label="Example requests"
-              >
-                {EXAMPLE_PROMPTS.map((p) => (
-                  <li key={p}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setText(p);
-                        inputRef.current?.focus();
-                      }}
-                      className="rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    >
-                      {p}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </EmptyState>
-          </div>
-        ) : (
-          <ol className="flex flex-col gap-3" aria-live="polite" aria-label="Conversation">
-            {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} />
-            ))}
-            {planning && (
-              <li className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" aria-hidden /> Planning on 0G…
-              </li>
-            )}
-          </ol>
-        )}
-        <div ref={endRef} />
-      </div>
-      <form
-        className="flex items-center gap-2 border-t border-border p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(text);
-        }}
-        aria-label="Message your agent"
+    <ComposerContext.Provider value={composer}>
+      <Panel
+        id="agent"
+        title="Agent"
+        subtitle="Plans on 0G · builds on Uniswap · you stay in control"
+        icon={<Bot />}
+        actions={<AgentBadge>{planning ? 'Thinking' : 'Ready'}</AgentBadge>}
+        className="min-h-[520px]"
+        bodyClassName="relative flex min-h-0 flex-col p-0"
       >
-        <label htmlFor="agent-input" className="sr-only">
-          Message your agent
-        </label>
-        <input
-          id="agent-input"
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={AGENT_MESSAGE_MAX_CHARS}
-          autoComplete="off"
-          placeholder={planning ? 'Your agent is planning…' : 'e.g. Swap $20 ETH to USDC'}
-          className="h-11 min-w-0 flex-1 rounded-md border border-input bg-surface-2 px-3.5 text-sm placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          className="size-11"
-          disabled={planning || text.trim().length === 0}
-          aria-label="Send message"
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4"
         >
-          {send.isPending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
-        </Button>
-      </form>
-    </Panel>
+          {messagesQuery.isPending ? (
+            <SkeletonRows rows={4} label="Loading your conversation" />
+          ) : messagesQuery.isError && !messagesQuery.data ? (
+            <ErrorState
+              title="Couldn't load your conversation"
+              description={messagesQuery.error.message}
+              onRetry={() => void messagesQuery.refetch()}
+              retrying={messagesQuery.isFetching}
+            />
+          ) : visible.length === 0 && !optimistic ? (
+            <Welcome name={user.displayName} onPick={composer.prefill} />
+          ) : (
+            <ol className="flex flex-col gap-4" aria-label="Conversation">
+              {visible.map((item, idx) => {
+                const day = dayLabel(item.message.createdAt, now);
+                const sep = day !== lastDay;
+                lastDay = day;
+                return (
+                  <FragmentWithSeparator key={item.message.id} day={sep ? day : null}>
+                    <Bubble item={item} preparing={planning && idx === visible.length - 1} />
+                  </FragmentWithSeparator>
+                );
+              })}
+              {optimistic && (
+                <li className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/80 px-3.5 py-2 text-sm text-primary-foreground">
+                    <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                      {optimistic.text}
+                    </p>
+                    <p className="mt-1.5 text-right text-[11px] text-primary-foreground/70">
+                      Sending…
+                    </p>
+                  </div>
+                </li>
+              )}
+              {planning && (
+                <li className="flex items-center gap-2 pl-0 sm:pl-9" aria-live="polite">
+                  <span className="flex gap-1" aria-hidden>
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="size-1.5 rounded-full bg-agent motion-safe:animate-bounce"
+                        style={{ animationDelay: `${i * 120}ms` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Agent is thinking…
+                    {step && <span className="text-foreground/80"> · {step}</span>}
+                  </span>
+                </li>
+              )}
+            </ol>
+          )}
+        </div>
+
+        {unseen && (
+          <button
+            type="button"
+            onClick={() => scrollToEnd(true)}
+            className="absolute bottom-[132px] left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-agent/40 bg-card px-3 py-1.5 text-xs font-medium text-agent shadow-lg shadow-black/40 hover:bg-surface-2"
+          >
+            <ArrowDown className="size-3.5" aria-hidden /> New messages
+          </button>
+        )}
+
+        <div className="border-t border-border p-3">
+          <ul className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick actions">
+            {QUICK_ACTIONS.map((a) => (
+              <li key={a.label} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => composer.prefill(a.text)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-agent/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <a.icon className="size-3.5" aria-hidden />
+                  {a.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(text);
+            }}
+            aria-label="Message your agent"
+          >
+            <div className="relative min-w-0 flex-1">
+              <label htmlFor="agent-input" className="sr-only">
+                Message your agent
+              </label>
+              <textarea
+                id="agent-input"
+                ref={inputRef}
+                rows={1}
+                value={text}
+                onChange={(e) => setText(e.target.value.slice(0, COMPOSER_MAX_CHARS))}
+                onKeyDown={onKeyDown}
+                maxLength={COMPOSER_MAX_CHARS}
+                disabled={planning}
+                aria-describedby="agent-input-hint"
+                placeholder={planning ? 'Your agent is thinking…' : 'Ask your agent…'}
+                className="block max-h-[152px] min-h-11 w-full resize-none rounded-lg border border-input bg-surface-2 px-3.5 py-2.5 pr-14 text-sm leading-[22px] placeholder:text-subtle-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+              />
+              <span
+                id="agent-input-hint"
+                className={cn(
+                  'pointer-events-none absolute right-2.5 bottom-2 text-[10.5px] tabular-nums',
+                  text.length > COMPOSER_MAX_CHARS - 50 ? 'text-caution' : 'text-subtle-foreground',
+                )}
+              >
+                {text.length > 0 ? (
+                  `${text.length}/${COMPOSER_MAX_CHARS}`
+                ) : (
+                  <span className="hidden sm:inline">⏎ send · ⇧⏎ line</span>
+                )}
+              </span>
+            </div>
+            <Button
+              type="submit"
+              size="icon"
+              className="size-11 shrink-0"
+              disabled={planning || text.trim().length === 0}
+              aria-label="Send message"
+            >
+              {planning ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
+            </Button>
+          </form>
+        </div>
+      </Panel>
+    </ComposerContext.Provider>
+  );
+}
+
+function FragmentWithSeparator({
+  day,
+  children,
+}: {
+  day: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      {day && (
+        <li className="sticky top-0 z-[5] -my-1 flex justify-center" aria-hidden={false}>
+          <span className="rounded-full border border-border bg-card/95 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground backdrop-blur">
+            {day}
+          </span>
+        </li>
+      )}
+      {children}
+    </>
+  );
+}
+
+function Welcome({ name, onPick }: { name: string | null; onPick: (t: string) => void }) {
+  return (
+    <div className="mx-auto flex max-w-xl flex-col items-center py-6 text-center sm:py-10">
+      <span className="flex size-12 items-center justify-center rounded-2xl border border-agent/30 bg-agent/10 text-agent">
+        <Bot className="size-6" aria-hidden />
+      </span>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight">
+        Hi {name ?? 'there'} — I'm your agent.
+      </h3>
+      <p className="mt-1.5 max-w-md text-sm text-muted-foreground">
+        I think on 0G, build on Uniswap and check every trade before it runs. Small, safe actions I
+        do alone; anything bigger waits for you.
+      </p>
+      <ul
+        className="mt-6 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2"
+        aria-label="Example requests"
+      >
+        {EXAMPLES.map((e) => (
+          <li key={e.text}>
+            <button
+              type="button"
+              onClick={() => onPick(e.text)}
+              className="group flex h-full w-full items-start gap-3 rounded-lg border border-border bg-surface-2/60 p-3 text-left transition-colors hover:border-agent/40 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <e.icon className="mt-0.5 size-4 shrink-0 text-agent" aria-hidden />
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  {e.title}
+                </span>
+                <span className="mt-0.5 block text-sm font-medium">“{e.text}”</span>
+                <span className="mt-0.5 block text-xs text-subtle-foreground">{e.hint}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
