@@ -40,6 +40,8 @@ export interface ChatInput extends CallContext {
   stream?: boolean;
   /** PLANNER calls fall back to the fallback model on failure unless this is false. */
   allowFallback?: boolean;
+  /** Overrides the role's configured deadline for this call. */
+  timeoutMs?: number;
   /** Trace kind of the emitted event (defaults: GUARD → guard, otherwise plan). */
   traceKind?: 'plan' | 'guard';
 }
@@ -391,7 +393,8 @@ export class ZgClient {
         : { stream: false }),
     };
     const timeoutMs =
-      input.role === 'PLANNER' ? this.env.ZG_PLANNER_TIMEOUT_MS : this.env.ZG_REQUEST_TIMEOUT_MS;
+      input.timeoutMs ??
+      (input.role === 'PLANNER' ? this.env.ZG_PLANNER_TIMEOUT_MS : this.env.ZG_REQUEST_TIMEOUT_MS);
     const options = { timeoutMs, ...(input.stream ? { stream: true } : {}) };
     try {
       return await this.call(input, '/chat/completions', body, options);

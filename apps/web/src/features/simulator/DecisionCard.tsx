@@ -25,6 +25,7 @@ const OUTCOME: Record<SimulatorOutcome, { label: string; tone: BadgeTone }> = {
   MIGRATE_LP: { label: 'Moved the position', tone: 'agent' },
   ADD_LIQUIDITY: { label: 'Added liquidity', tone: 'agent' },
   REMOVE_LIQUIDITY: { label: 'Removed liquidity', tone: 'agent' },
+  OTHER_ACTION: { label: 'Other action', tone: 'caution' },
   NO_ACTION: { label: 'No action', tone: 'safe' },
   NO_DECISION: { label: 'No decision reached', tone: 'caution' },
 };
@@ -37,6 +38,7 @@ const PROPOSED: Partial<Record<SimulatorOutcome, string>> = {
   MIGRATE_LP: 'Move the position',
   ADD_LIQUIDITY: 'Add liquidity',
   REMOVE_LIQUIDITY: 'Remove liquidity',
+  OTHER_ACTION: 'Other action',
 };
 
 const SUPPORTS: Record<'ACT' | 'HOLD' | 'NEUTRAL', { label: string; tone: BadgeTone }> = {

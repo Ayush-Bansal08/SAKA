@@ -85,6 +85,8 @@ export const SIMULATOR_OUTCOMES = [
   'MIGRATE_LP',
   'ADD_LIQUIDITY',
   'REMOVE_LIQUIDITY',
+  /** Something a simulated run may not do (a transfer, a rule): reported, then rejected. */
+  'OTHER_ACTION',
   'NO_ACTION',
   /** The model asked a question instead of deciding: reported, not dressed up as a decision. */
   'NO_DECISION',

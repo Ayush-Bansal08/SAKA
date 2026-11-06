@@ -86,7 +86,7 @@ export function SimulatorPanel() {
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
         <Panel
           title="Scenarios"
-          subtitle={MODE_HELP[mode]}
+          subtitle="Market conditions only"
           icon={<FlaskConical />}
           actions={
             <>
@@ -116,7 +116,8 @@ export function SimulatorPanel() {
                   />
                 ))}
               </ul>
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="mt-3 text-[13px] font-medium">{MODE_HELP[mode]}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 The first two are both ETH drops. The trigger is alike; the evidence around it is
                 not. Market data in these runs is simulated, and real transactions always use the
                 testnet's own quotes.

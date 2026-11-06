@@ -26,6 +26,8 @@ export const ethCrashGuard: Scenario = {
     trend24h: 'negative',
     poolDepthChange24hPct: -30,
     priceImpactForTradeSize: 'rising',
+    priceImpactForTradeSizePct: 0.6,
+    swapGasUsd: 0.9,
     realizedVolatility: 'spiking',
     stablecoinDepeg: false,
     gas: 'elevated, not prohibitive',

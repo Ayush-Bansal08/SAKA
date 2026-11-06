@@ -30,7 +30,8 @@ export const lpMigrationNotWorthIt: Scenario = {
     migrationGasUsd: '14',
     migrationSlippagePct: '0.75',
     hook: {
-      address: '0x00000000000000000000000000000000005a1c00',
+      // Distinctive on purpose: the model miscopied a long run of zeros.
+      address: '0x7f3a9c41d2e85b06a1c4f7e3b92d5c8e10a65c00',
       score: 46,
       band: 'CAUTION',
       owner: '0x000000000000000000000000000000000000a11c',

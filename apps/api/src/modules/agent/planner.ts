@@ -100,6 +100,8 @@ export type PlanResult =
 export interface PlanOptions {
   /** Adds a `digest` argument of this shape to `propose` and `answer`; returned unvalidated. */
   digest?: z.ZodTypeAny;
+  /** Per-call deadline, for runs that write more than a chat reply. */
+  timeoutMs?: number;
 }
 
 export class PlannerError extends Error {
@@ -342,6 +344,7 @@ export async function plan(
       tools: terminalOnly ? terminalTools : allTools,
       toolChoice: 'required',
       maxTokens: options.digest ? 3000 : 2000,
+      ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
     });
     const message = ResponseSchema.parse(response.data).choices[0]!.message;
     const calls = message.tool_calls ?? [];

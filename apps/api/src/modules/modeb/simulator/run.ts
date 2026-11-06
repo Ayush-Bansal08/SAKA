@@ -40,7 +40,9 @@ import { SCENARIOS } from './scenarios/index.js';
 import type { AgentEvent, Scenario } from './types.js';
 
 const RUN_TTL_S = 7 * 86_400;
-const LOCK_TTL_S = 300;
+const LOCK_TTL_S = 600;
+/** A decision with its digest outgrows the chat deadline: measured over 12 s on GLM-5.3. */
+const REASONING_TIMEOUT_MS = 60_000;
 const MAX_RUNS = 20;
 
 export const simulatorKeys = {
@@ -115,7 +117,7 @@ export function outcomeOf(intent: ActionIntent): SimulatorOutcome {
     case 'lp_exit':
       return 'REMOVE_LIQUIDITY';
     default:
-      return 'SWAP';
+      return 'OTHER_ACTION';
   }
 }
 
@@ -126,6 +128,9 @@ function digestOf(value: unknown): DecisionDigest | null {
 
 export function decisionOf(result: PlanResult): SimulatorDecision {
   const base = { digest: digestOf(result.digest), zg: result.zg };
+  // The model sometimes says "no action" through an `info` intent instead of `answer`.
+  if (result.kind === 'intent' && result.intent.type === 'info')
+    return { ...base, outcome: 'NO_ACTION', summary: null, rationale: result.intent.reason };
   if (result.kind === 'intent')
     return {
       ...base,
@@ -283,7 +288,7 @@ async function execute(deps: ModeBDeps, run: RunRecord, scenario: Scenario): Pro
       ctx,
       plannerContext,
       [{ role: 'user', content: 'A market event arrived. Investigate it and decide.' }],
-      { digest: DecisionDigestSchema },
+      { digest: DecisionDigestSchema, timeoutMs: REASONING_TIMEOUT_MS },
     );
     const decision = decisionOf(result);
     run.decision = decision;
@@ -297,7 +302,8 @@ async function execute(deps: ModeBDeps, run: RunRecord, scenario: Scenario): Pro
       data: { outcome: decision.outcome, digest: decision.digest },
     });
 
-    const proposed = result.kind === 'intent' ? result.intent : null;
+    const proposed =
+      result.kind === 'intent' && result.intent.type !== 'info' ? result.intent : null;
     const intent = proposed && RUNNABLE.has(proposed.type) ? proposed : null;
     if (proposed && !intent) {
       run.rejected = true;

@@ -173,6 +173,17 @@ describe('decisions', () => {
     expect(decisionOf({ kind: 'answer', text: 'x', zg, facts: [] }).digest).toBeNull();
   });
 
+  it('reads an info intent as no action, as the live model sometimes sends it', () => {
+    const intent = { type: 'info', topic: 'risk', reason: 'No LP migration: costs eat the yield.' };
+    const d = decisionOf({ kind: 'intent', intent, zg } as never);
+    expect(d).toMatchObject({ outcome: 'NO_ACTION', summary: null, rationale: intent.reason });
+  });
+
+  it('never labels an unknown action as a swap', () => {
+    const transfer = { type: 'transfer', token: { symbol: 'USDC' }, amount: '1', reason: 'r' };
+    expect(outcomeOf(transfer as never)).toBe('OTHER_ACTION');
+  });
+
   it('does not pass a question off as a decision', () => {
     const d = decisionOf({
       kind: 'answer',
@@ -428,6 +439,19 @@ describe('simulator routes', () => {
       expect(run.decision).toMatchObject({ outcome: 'NO_ACTION', rationale: h.script.answer });
       expect(run.decision?.digest?.risks).toEqual(['young pool']);
       expect(run.suggestion).toMatchObject({ status: 'INFO', simulated: true, plan: null });
+      expect(await h.plans()).toHaveLength(0);
+    } finally {
+      await h.app.close();
+    }
+  });
+
+  it('an info intent ends as no action, not as a rejection', async () => {
+    const h = await harness();
+    h.script.proposals = [{ type: 'info', topic: 'risk', reason: 'No migration: costs eat it.' }];
+    try {
+      const run = await h.run('LP_MIGRATION_NOT_WORTH_IT', 'DEMO');
+      expect(run).toMatchObject({ status: 'DONE', rejected: false, notice: null });
+      expect(run.decision?.outcome).toBe('NO_ACTION');
       expect(await h.plans()).toHaveLength(0);
     } finally {
       await h.app.close();

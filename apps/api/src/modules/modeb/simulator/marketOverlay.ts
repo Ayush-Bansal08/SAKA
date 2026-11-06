@@ -16,7 +16,7 @@ import type { Scenario } from './types.js';
 
 export const SIMULATION_NOTE = 'Market data in this run is a simulated scenario.';
 const QUOTE_NOTE =
-  'Real quote, not part of the scenario. Use it for gas and price impact; the scenario price is in the simulation context.';
+  'Real testnet quote. Testnet tokens have no market value and test pools are not priced to the market, so the rate implied here says nothing about value in this scenario. Use it only to confirm a route exists. The scenario price and costs are in simulation.market.';
 const HOOK_NOTE =
   'Synthetic hook for this scenario. The score is a risk indicator, not a security certification.';
 
@@ -84,6 +84,12 @@ function lpFacts(scenario: Scenario, portfolio: PortfolioResponse) {
       ageHours: lp.candidateAgeHours,
       volume: lp.candidateVolume,
       hookAddress: lp.hook.address,
+      hookRisk: {
+        score: lp.hook.score,
+        band: lp.hook.band,
+        findings: lp.hook.findings,
+        note: 'A risk indicator, not a security certification.',
+      },
       syntheticPool: true,
     },
     migrationCosts: {

@@ -24,6 +24,8 @@ export const ethDip: Scenario = {
     downsideVolumeVsNormal: '1.0x',
     poolDepthChange24hPct: -1,
     priceImpactForTradeSize: 'normal',
+    priceImpactForTradeSizePct: 0.1,
+    swapGasUsd: 0.4,
     realizedVolatility: 'easing',
     stablecoinDepeg: false,
     protocolOrHookIncident: false,
