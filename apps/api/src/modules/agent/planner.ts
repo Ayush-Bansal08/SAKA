@@ -310,6 +310,26 @@ function errorPayload(err: unknown): unknown {
   return { error: 'tool_unavailable', message: 'Do not invent results; answer or ask instead.' };
 }
 
+const USD_PEGGED = new Set(['USDC', 'USDT', 'DAI']);
+const DOLLAR_AMOUNT = /\$\s*(\d[\d,]*(?:\.\d+)?)\s+(?:(?:worth\s+)?of\s+)?([a-z][a-z0-9]*)/gi;
+
+/**
+ * The prompt says "$20 ETH" means $20 worth of ETH, but the model has returned 1 ETH for "$1 ETH".
+ * Returns the correction when a swap's token amount is the request's dollar figure. For a
+ * dollar-pegged token the two really are the same number, so "$20 USDC" passes.
+ */
+export function dollarAmountMisread(request: string, intent: ActionIntent): string | null {
+  if (intent.type !== 'swap_exact_in') return null;
+  const symbol = intent.tokenIn.symbol?.toUpperCase();
+  if (!symbol || USD_PEGGED.has(symbol)) return null;
+  for (const [, dollars, token] of request.matchAll(DOLLAR_AMOUNT)) {
+    const figure = dollars!.replace(/,/g, '');
+    if (token!.toUpperCase() === symbol && new Decimal(intent.amountIn).eq(figure))
+      return `The human asked for $${figure} worth of ${symbol}, not ${figure} ${symbol}. Set amountUsd to "${figure}" and amountIn to ${figure} / the ${symbol} reference price.`;
+  }
+  return null;
+}
+
 export async function plan(
   client: ZgClient,
   mcp: Pick<UniswapMcpClient, 'callTool'>,
@@ -388,6 +408,10 @@ export async function plan(
           throw new PlannerError(
             `These addresses appear nowhere in the conversation or tools: ${invented.join(', ')}. Use symbols or ask for the full address.`,
           );
+        // Chat only: a simulator run's "request" is a generated event, not the human's words.
+        const request = history.filter((m) => m.role === 'user').at(-1)?.content;
+        const misread = options.digest || !request ? null : dollarAmountMisread(request, intent);
+        if (misread) throw new PlannerError(misread);
         return { kind: 'intent', intent, zg: response.zg, ...digest };
       } catch (err) {
         problem = err;

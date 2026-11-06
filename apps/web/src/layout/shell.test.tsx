@@ -6,6 +6,7 @@ import { Redirect } from '@/app/Redirect';
 import { observePrefill, requestPrefill, subscribePrefill } from '@/features/agent/prefill';
 import { useStoredFlag } from '@/hooks/useStoredFlag';
 import { splitExplanation } from '@/features/hooks/permission-copy';
+import { isNews } from './useTraceToasts';
 
 describe('Redirect', () => {
   function Where() {
@@ -63,6 +64,14 @@ describe('useStoredFlag', () => {
     expect(result.current[0]).toBe(true);
     act(() => result.current[1](false));
     expect(result.current[0]).toBe(false);
+  });
+});
+
+describe('isNews', () => {
+  it('treats replayed history as old and live events as news', () => {
+    const since = Date.parse('2026-11-07T12:00:00.000Z');
+    expect(isNews({ ts: '2026-11-07T09:00:00.000Z' }, since)).toBe(false);
+    expect(isNews({ ts: '2026-11-07T12:00:01.000Z' }, since)).toBe(true);
   });
 });
 

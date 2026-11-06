@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { ActionIntent } from '@warden/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { PrismaClient } from '@prisma/client';
@@ -19,6 +20,7 @@ import {
   proposeParameters,
   quoteDecimalFields,
   toolSchema,
+  dollarAmountMisread,
 } from '../src/modules/agent/planner.js';
 import type { PlannerContext } from '../src/modules/agent/context.js';
 import { testEnv } from './helpers.js';
@@ -661,6 +663,45 @@ describe('planner loop', () => {
     ).toMatchObject({ kind: 'intent', intent: swapIntent });
     expect(callTool).not.toHaveBeenCalled();
     expect(requestBody(fetcher, 1).messages.at(-1).content).toContain('must be one of');
+  });
+
+  it('sends "$1 ETH" read as 1 ETH back to the model, and takes the corrected amount', async () => {
+    const misread = { ...swapIntent, amountIn: '1', amountUsd: undefined };
+    const fixed = { ...swapIntent, amountIn: '0.000448', amountUsd: '1' };
+    const { client, fetcher } = setup([
+      response(terminal('propose', misread)),
+      response(terminal('propose', fixed)),
+    ]);
+    expect(
+      await plan(client, { callTool: vi.fn() }, ctx, context, [
+        { role: 'user', content: 'Swap $1 ETH to USDC' },
+      ]),
+    ).toMatchObject({ kind: 'intent', intent: fixed });
+    expect(requestBody(fetcher, 1).messages.at(-1).content).toContain('$1 worth of ETH');
+  });
+
+  it('refuses to guess if the model repeats the "$1 ETH" mistake', async () => {
+    const misread = { ...swapIntent, amountIn: '1', amountUsd: '1' };
+    const { client } = setup([
+      response(terminal('propose', misread)),
+      response(terminal('propose', misread)),
+    ]);
+    await expect(
+      plan(client, { callTool: vi.fn() }, ctx, context, [
+        { role: 'user', content: 'Swap $1 ETH to USDC' },
+      ]),
+    ).rejects.toThrow('could not validate');
+  });
+
+  it('only flags a dollar figure used as a token amount', () => {
+    const swap = (symbol: string, amountIn: string) =>
+      ({ ...swapIntent, tokenIn: { symbol }, amountIn }) as ActionIntent;
+    expect(dollarAmountMisread('Swap $1 ETH to USDC', swap('ETH', '1'))).toContain('$1 worth');
+    expect(dollarAmountMisread('Swap $2,000 of ETH', swap('ETH', '2000'))).toContain('$2000');
+    expect(dollarAmountMisread('Swap $1 ETH to USDC', swap('ETH', '0.000448'))).toBeNull();
+    expect(dollarAmountMisread('Swap 1 ETH to USDC', swap('ETH', '1'))).toBeNull();
+    expect(dollarAmountMisread('Swap $20 USDC to ETH', swap('USDC', '20'))).toBeNull();
+    expect(dollarAmountMisread('Swap 1 ETH, about $1 ETH', swap('WETH', '1'))).toBeNull();
   });
 
   it('fails after a second invalid final intent', async () => {

@@ -454,7 +454,7 @@ function FragmentWithSeparator({
   return (
     <>
       {day && (
-        <li className="sticky top-0 z-[5] -my-1 flex justify-center" aria-hidden={false}>
+        <li className="-my-1 flex justify-center">
           <span className="rounded-full border border-border bg-popover px-3 py-0.5 text-xs font-medium text-muted-foreground">
             {day}
           </span>

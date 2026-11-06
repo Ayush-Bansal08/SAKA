@@ -19,11 +19,15 @@ export function toastKind(e: TraceEvent): ToastKind {
   return null;
 }
 
+/** The stream replays history on connect, so anything older than this session is not news. */
+export const isNews = (e: Pick<TraceEvent, 'ts'>, since: number) => Date.parse(e.ts) >= since;
+
 export function useTraceToasts(): void {
   const { events } = useTraceStream();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const seen = useRef<Set<string> | null>(null);
+  const mountedAt = useRef(Date.now());
   const inChat = pathname === '/app';
 
   useEffect(() => {
@@ -34,6 +38,7 @@ export function useTraceToasts(): void {
     for (const e of events) {
       if (seen.current.has(e.id)) continue;
       seen.current.add(e.id);
+      if (!isNews(e, mountedAt.current)) continue;
       const kind = toastKind(e);
       if (kind === 'red') {
         toast.error(e.title, {

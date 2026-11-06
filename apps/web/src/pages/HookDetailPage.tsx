@@ -207,7 +207,7 @@ export function HookDetailPage() {
           retrying={hook.isFetching}
         />
       ) : h ? (
-        <div className="grid gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
           <header className="glass flex flex-wrap items-start gap-5 rounded-lg border border-border p-6">
             <ScoreRing score={h.score} band={h.band} size="lg" />
             <div className="min-w-0 flex-1">
@@ -266,7 +266,7 @@ export function HookDetailPage() {
             ) : null}
           </Panel>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
             <Panel
               title="Score breakdown"
               icon={<ListChecks />}
@@ -377,7 +377,7 @@ export function HookDetailPage() {
             </dl>
           </Panel>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
             <Panel title="Pools" icon={<Waves />} bodyClassName="p-0">
               {h.pairs.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">
