@@ -18,7 +18,11 @@ export function ApprovalPage() {
   const pending = a?.status === 'PENDING' && left > 0;
   return (
     <PageContainer>
-      <PageHeader title="Approval" description="Your agent wants to do something that needs you." />
+      <PageHeader
+        eyebrow="Approval"
+        title="This needs you"
+        description="Your agent wants to do something that needs you."
+      />
       <Panel title={a?.summary ?? 'Loading…'} icon={<ShieldAlert />} className="max-w-xl">
         {approval.isPending ? (
           <SkeletonRows rows={3} />
@@ -92,7 +96,7 @@ export function ApprovalPage() {
                 left === 0
                   ? 'Nothing was traded. '
                   : 'This approval is closed. '}
-                <Link to="/" className="text-primary underline-offset-4 hover:underline">
+                <Link to="/ask" className="text-primary underline underline-offset-4">
                   Back to your agent
                 </Link>
               </p>

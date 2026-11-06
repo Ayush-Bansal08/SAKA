@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Banner } from '@/components/ui-kit';
 import { DevBanner } from '@/layout/DevBanner';
 import { usesDevProviders } from '@/layout/dev-mode';
-import { LogoMark } from '@/layout/Logo';
+import { Wordmark } from '@/layout/Logo';
 import { ApiError } from '@/lib/api';
 import { useDevSignIn } from './hooks';
 
@@ -24,20 +24,22 @@ const PILLARS = [
 
 export function SignInPage({ providers }: { providers: ProvidersResponse }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="dot-matrix flex min-h-dvh flex-col">
       {usesDevProviders(providers) && <DevBanner />}
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex flex-col items-center text-center">
-            <LogoMark className="size-12" />
-            <h1 className="mt-5 text-2xl font-semibold tracking-tight">{providers.appName}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <h1>
+              <Wordmark className="h-20" />
+              <span className="sr-only">{providers.appName}</span>
+            </h1>
+            <p className="mt-4 text-[15px] leading-6 text-muted-foreground">
               Your own AI agent for DeFi — it plans, checks and executes on Uniswap, and asks you
               before anything big.
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-6 shadow-2xl shadow-black/30">
+          <div className="surface-highlight rounded-lg border border-border-strong bg-card/90 p-6 backdrop-blur">
             {providers.identity === 'dev' ? (
               <DevSignInForm />
             ) : (
@@ -89,7 +91,7 @@ function DevSignInForm() {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold">Sign in</h2>
+        <h2 className="text-h3 font-medium">Sign in</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Development identity: the same name always signs in as the same human.
         </p>

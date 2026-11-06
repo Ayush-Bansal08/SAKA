@@ -289,7 +289,6 @@
  * Brand backdrops.
  * .dot-matrix: an LED field lit by soft diagonal streaks, for splash, connect and share images.
  * .horizon: the glowing arc. Home only, because it is the signature moment.
- * .ghost-type: oversized outlined wordmark, at most once per screen.
  */
 .dot-matrix {
   position: relative;
@@ -360,14 +359,24 @@
   );
 }
 
-.ghost-type {
-  color: transparent;
-  -webkit-text-stroke: 1px var(--line);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  user-select: none;
+/* A faint LED layer behind the Home hero. */
+.dot-field {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 420px;
   pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.4px);
+  background-size: 6px 6px;
+  mask-image: radial-gradient(60% 80% at 50% 0%, #000, transparent 75%);
+}
+
+/* A directional beam: the Autopilot header's one accent. */
+.beam {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 300px;
+  pointer-events: none;
+  background: radial-gradient(70% 90% at 100% 0%, var(--ai-soft), transparent 70%);
 }
 
 /* Everything beyond a simple opacity change stops. */

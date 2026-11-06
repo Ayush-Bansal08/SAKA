@@ -8,14 +8,18 @@ import { SignInPage } from '@/features/auth/SignInPage';
 import { OnboardingWizard } from '@/features/onboarding/OnboardingWizard';
 import { TraceStreamProvider } from '@/features/trace/TraceStreamProvider';
 import { AppShell } from '@/layout/AppShell';
-import { LogoMark } from '@/layout/Logo';
+import { Wordmark } from '@/layout/Logo';
 import { ApiError } from '@/lib/api';
 import { API_URL } from '@/lib/config';
 
 function Splash({ label }: { label: string }) {
   return (
-    <div role="status" aria-label={label} className="flex min-h-dvh items-center justify-center">
-      <LogoMark className="size-10 animate-pulse" />
+    <div
+      role="status"
+      aria-label={label}
+      className="dot-matrix flex min-h-dvh items-center justify-center"
+    >
+      <Wordmark className="h-16 animate-pulse" />
       <span className="sr-only">{label}…</span>
     </div>
   );

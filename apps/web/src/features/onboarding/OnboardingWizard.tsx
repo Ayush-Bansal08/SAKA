@@ -106,7 +106,7 @@ export function OnboardingWizard({
   return (
     <div className="flex min-h-dvh flex-col">
       {usesDevProviders(providers) && <DevBanner />}
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-6">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-6">
         <Logo appName={providers.appName} />
         <UserMenu user={user} />
       </header>
@@ -122,7 +122,7 @@ export function OnboardingWizard({
               ))}
             </div>
           )}
-          <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
+          <div className="surface-highlight mt-6 rounded-lg border border-border bg-card p-5 sm:p-8">
             {onboarding.isPending ? (
               <WizardSkeleton />
             ) : onboarding.isError ? (
@@ -216,7 +216,7 @@ function StepHeader({
     <div className="flex flex-col items-center text-center">
       <div
         className={cn(
-          'flex size-14 items-center justify-center rounded-2xl border [&_svg]:size-6',
+          'flex size-14 items-center justify-center rounded-full border [&_svg]:size-6',
           tone === 'agent' && 'border-agent/25 bg-agent/10 text-agent',
           tone === 'human' && 'border-human/25 bg-human/10 text-human',
           tone === 'safe' && 'border-safe/25 bg-safe/10 text-safe',
@@ -224,7 +224,7 @@ function StepHeader({
       >
         {icon}
       </div>
-      <h1 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+      <h1 className="text-h2 mt-4 font-medium">{title}</h1>
       {description && (
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{description}</p>
       )}

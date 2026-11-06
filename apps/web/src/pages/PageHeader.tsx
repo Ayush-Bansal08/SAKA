@@ -17,7 +17,9 @@ export function PageHeader({
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <p className="micro-label mb-3 text-subtle-foreground">[ {eyebrow} ]</p>}
+        {eyebrow && (
+          <p className="micro-label mb-3 text-subtle-foreground sm:hidden">[ {eyebrow} ]</p>
+        )}
         <h1 className="text-h1 font-medium">
           {title}
           {accent && <span className="serif-accent"> {accent}</span>}
