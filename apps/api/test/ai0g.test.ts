@@ -10,6 +10,7 @@ import {
   parseDecision,
   renderGuardState,
   GUARD_STATE_MAX_CHARS,
+  GUARD_TESTNET_NOTE,
   GUARD_UNAVAILABLE_REASON,
   type GuardInput,
 } from '../src/modules/safety/guard.js';
@@ -551,6 +552,23 @@ describe('guard (Vela decisions)', () => {
     expect(state).toContain('+45 more');
     expect(renderGuardState(big)).toBe(state);
     expect(renderGuardState(guardInput)).toContain('Simulation: passed');
+    expect(state).toContain(GUARD_TESTNET_NOTE);
+  });
+
+  it('never blames a simulation that passed', async () => {
+    const { client, fetcher } = setup([
+      decision({
+        verdict: { choice: 'block', probabilities: { approve: 0.35, block: 0.65 } },
+        risk: { score: 0.6 },
+        concerns: { choice: 'simulation_failed' },
+      }),
+    ]);
+    const result = await guard(client, ctx, guardInput);
+    expect(result.verdict).toBe('block');
+    expect(result.concerns).toEqual(['none']);
+    expect(result.reason).toContain('not confident enough');
+    expect(result.reason).not.toMatch(/simulation/i);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
 

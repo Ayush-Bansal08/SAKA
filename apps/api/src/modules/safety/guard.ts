@@ -33,6 +33,13 @@ const CONCERN_LABEL: Record<GuardConcern, string> = {
 export const GUARD_UNAVAILABLE_REASON = 'Safety check unavailable — nothing was executed.';
 /** ≈ 450 tokens of English: inside the 512-token budget for Vela's English checkpoint. */
 export const GUARD_STATE_MAX_CHARS = 1800;
+/**
+ * Execution is testnet only, and testnet pools are priced apart from mainnet ($10 of ETH can quote
+ * 113 USDC). Without this the guard reads that gap and ~1% impact as danger and blocks at random.
+ * Impact stays covered: the trade score penalises it and the policy refuses anything over 5%.
+ */
+export const GUARD_TESTNET_NOTE =
+  'Network: testnet, test funds only. Testnet pools are priced independently of mainnet, so the amount out not matching the USD value is normal and not a risk. Price impact is scored separately and anything over 5% is refused separately, so a lower impact is not a reason to block.';
 
 export interface GuardInput {
   intent: ActionIntent;
@@ -87,7 +94,7 @@ export function renderGuardState(input: GuardInput): string {
             (v as { address?: string }).address,
         )
       : fmt(v);
-  const out: string[] = [`Action: ${input.intent.type}.`];
+  const out: string[] = [`Action: ${input.intent.type}.`, GUARD_TESTNET_NOTE];
   const parts: string[] = [];
   if ('tokenIn' in i) parts.push(`in ${token(i.tokenIn)}`);
   if ('tokenOut' in i) parts.push(`out ${token(i.tokenOut)}`);
@@ -309,17 +316,20 @@ export async function guard(
             .then((r) => ({ decision: parseDecision(r.data), zg: r.zg }));
     const decision = result.decision;
     const blocked = decision.choice === 'block' || decision.pApprove < GUARD_MIN_P_APPROVE;
-    const concerns: GuardConcern[] = [decision.concern];
+    // The guard only runs after a passed simulation, so this concern can only be a model error.
+    const concern =
+      decision.concern === 'simulation_failed' && input.simulation?.ok ? 'none' : decision.concern;
+    const concerns: GuardConcern[] = [concern];
     // Only a block is explained by the model (its prompt is about why it was blocked); an
     // approval with a concern gets a deterministic note so it never reads like a block.
     const reason = blocked
-      ? decision.concern === 'none'
+      ? concern === 'none'
         ? // Blocked on confidence alone: say so plainly (the explainer would only guess).
           `The 0G guard was not confident enough to approve (p=${decision.pApprove.toFixed(2)}, needs ${GUARD_MIN_P_APPROVE.toFixed(2)}).`
         : await new Explainer(client, ctx).guardReason(concerns, reasonFacts(input))
-      : decision.concern === 'none'
+      : concern === 'none'
         ? 'Safety checks passed.'
-        : `Safety checks passed (worth watching: ${CONCERN_LABEL[decision.concern]}).`;
+        : `Safety checks passed (worth watching: ${CONCERN_LABEL[concern]}).`;
     return {
       verdict: blocked ? 'block' : 'approve',
       pApprove: decision.pApprove,
