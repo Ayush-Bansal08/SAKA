@@ -5,19 +5,19 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Banner } from '@/components/ui-kit';
 import { FlowField } from '@/components/ui-kit/FlowField';
 import { DevBanner } from '@/layout/DevBanner';
 import { usesDevProviders } from '@/layout/dev-mode';
 import { Wordmark } from '@/layout/Logo';
 import { ApiError } from '@/lib/api';
-import { useDevSignIn } from './hooks';
+import { passkeyErrorMessage } from '@/lib/passkey';
+import { useDevSignIn, usePasskeySignIn } from './hooks';
 
 const PILLARS = [
   {
     icon: Fingerprint,
-    title: 'One human, one agent',
-    body: 'Your agent belongs to a verified human.',
+    title: 'Only you can sign in',
+    body: 'Your passkey never leaves your device.',
   },
   { icon: ShieldCheck, title: 'You stay in control', body: 'Big moves always wait for you.' },
   { icon: BadgeCheck, title: 'Verifiable decisions', body: 'Every decision is logged on 0G.' },
@@ -42,13 +42,7 @@ export function SignInPage({ providers }: { providers: ProvidersResponse }) {
           </div>
 
           <div className="glass rounded-lg border border-border-strong p-6">
-            {providers.identity === 'dev' ? (
-              <DevSignInForm />
-            ) : (
-              <Banner tone="info" title="Sign-in unavailable">
-                World ID sign-in is not enabled on this server yet.
-              </Banner>
-            )}
+            {providers.identity === 'dev' ? <DevSignInForm /> : <PasskeySignInForm />}
           </div>
 
           <ul className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -64,6 +58,83 @@ export function SignInPage({ providers }: { providers: ProvidersResponse }) {
           </ul>
         </div>
       </main>
+    </div>
+  );
+}
+
+function PasskeySignInForm() {
+  const inputId = useId();
+  const errorId = useId();
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const signIn = usePasskeySignIn();
+
+  function run(displayName?: string) {
+    setError(null);
+    signIn.mutate(displayName, {
+      onSuccess: (res) => toast.success(`Welcome, ${res.user.displayName ?? 'back'}`),
+      onError: (err) => setError(passkeyErrorMessage(err)),
+    });
+  }
+
+  function onCreate(e: FormEvent) {
+    e.preventDefault();
+    const parsed = DisplayNameSchema.safeParse(name);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Enter a name');
+      return;
+    }
+    run(parsed.data);
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-h3 font-medium">Sign in</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use your fingerprint, face or device PIN. There is no password.
+        </p>
+      </div>
+      <Button size="lg" className="w-full" disabled={signIn.isPending} onClick={() => run()}>
+        {signIn.isPending ? (
+          <Loader2 className="animate-spin" aria-hidden />
+        ) : (
+          <Fingerprint aria-hidden />
+        )}
+        Sign in with passkey
+      </Button>
+      <form onSubmit={onCreate} noValidate className="space-y-2 border-t border-border pt-5">
+        <Label htmlFor={inputId}>New here? Choose a name</Label>
+        <Input
+          id={inputId}
+          name="displayName"
+          autoComplete="nickname"
+          placeholder="e.g. alice"
+          value={name}
+          maxLength={40}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError(null);
+          }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          disabled={signIn.isPending}
+        />
+        <Button
+          type="submit"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          disabled={signIn.isPending}
+        >
+          Create account <ArrowRight aria-hidden />
+        </Button>
+      </form>
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

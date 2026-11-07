@@ -172,9 +172,7 @@ describe('ApprovalCard', () => {
     ).toBeInTheDocument();
     expect(within(card).getByText('60 / max 25')).toBeInTheDocument();
     expect(within(card).getByText(/Expires in [34]:\d\d/)).toBeInTheDocument();
-    expect(
-      within(card).getByText(/World ID step-up replaces this in Phase 10/),
-    ).toBeInTheDocument();
+    expect(within(card).getByText(/Approve \(dev\) is for local testing only/)).toBeInTheDocument();
     await userEvent.click(within(card).getByRole('button', { name: 'Reject' }));
     await waitFor(() =>
       expect(ui.fetchMock).toHaveBeenCalledWith(
@@ -311,7 +309,7 @@ describe('ReceiptCard', () => {
 
   it('0G verified popover lists every inference with model, trust mode and request ID', async () => {
     renderUi(<PlanCards cards={[receipt({ approvedBy: 'HUMAN' })]} />);
-    expect(screen.getByText('Verified human')).toBeInTheDocument();
+    expect(screen.getByText('Approved by you')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /0G verified — 2 inferences/ }));
     expect(await screen.findByText('Decided on 0G')).toBeInTheDocument();
     expect(screen.getByText('glm-5.3')).toBeInTheDocument();

@@ -1,12 +1,12 @@
 /**
  * Onboarding state machine on User.onboardingStep (PHASE 03 §2):
  *
- *   VERIFY ──(sign-in / World enrollment)──▶ WALLET ──POST /onboarding/wallet──▶ PROFILE
+ *   VERIFY ──(sign-in)──▶ WALLET ──POST /onboarding/wallet──▶ PROFILE
  *   PROFILE ──POST /onboarding/profile──▶ FUND ──(balance watcher: first native deposit)──▶ DONE
  *
  * Transitions are compare-and-set (`updateMany where step = from`), so retries and concurrent
  * requests can never skip or repeat a step. Choosing the first profile needs no step-up; once
- * onboarding is DONE, profile changes go through STEP_UP (PHASE 10).
+ * onboarding is DONE, profile changes are refused with STEP_UP_REQUIRED.
  */
 import { Prisma, type PrismaClient, type User } from '@prisma/client';
 import {
@@ -201,8 +201,8 @@ export async function chooseProfileStep(
     throw new AppError(
       'STEP_UP_REQUIRED',
       409,
-      'Changing your risk profile needs a fresh World ID verification (coming in Phase 10).',
-      { reason: 'RISK_PROFILE_CHANGE', availableIn: 'Phase 10' },
+      'Changing your risk profile is not available yet.',
+      { reason: 'RISK_PROFILE_CHANGE' },
     );
   }
   if (!(await findAgentWallet(deps.prisma, user.id))) {
@@ -228,8 +228,8 @@ export async function chooseProfileStep(
     throw new AppError(
       'STEP_UP_REQUIRED',
       409,
-      'Your agent is already funded; changing the profile now needs World ID (coming in Phase 10).',
-      { reason: 'RISK_PROFILE_CHANGE', availableIn: 'Phase 10' },
+      'Your agent is already funded, so changing its profile is not available yet.',
+      { reason: 'RISK_PROFILE_CHANGE' },
     );
   }
   const s = riskProfileSettings(riskProfile);

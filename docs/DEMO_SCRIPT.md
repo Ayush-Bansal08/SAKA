@@ -28,8 +28,8 @@ Live app: <https://saka-rust.vercel.app>. Sign in as `demo`, which has the funde
 
 ## Be upfront about
 
-- World ID isn't in this build. Sign-in and approvals use the labelled dev identity, which is why
-  the amber banner shows.
+- The hosted demo uses the labelled dev identity until passkeys are switched on, which is why the
+  amber banner shows.
 - Swaps run on Ethereum Sepolia. Mainnet is read-only, for market data.
 
 ## If something is slow or fails

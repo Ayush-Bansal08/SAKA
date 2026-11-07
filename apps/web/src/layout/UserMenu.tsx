@@ -37,7 +37,7 @@ export function UserMenu({ user }: { user: UserView }) {
         <DropdownMenuLabel>
           <div className="truncate text-sm font-medium">{name}</div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            <HumanBadge>Verified human</HumanBadge>
+            <HumanBadge>Account owner</HumanBadge>
             {user.identityKind === 'dev' && <Badge tone="caution">DEV identity</Badge>}
           </div>
         </DropdownMenuLabel>

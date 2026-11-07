@@ -128,7 +128,7 @@ async function sendOutcome(
   if (!user?.telegramChatId) return;
   const view = await loadSuggestionView(deps.prisma, deps.chainId, row.id);
 
-  // P10 replaces this button with the World device flow inside Telegram.
+  // Passkeys are signed in the browser, so Telegram links to the approval page.
   const approvalId = view.plan?.status === 'AWAITING_APPROVAL' ? view.plan.approvalId : null;
   const link =
     n.link ??

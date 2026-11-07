@@ -15,4 +15,3 @@ When a file is present, its field names override anything written in a phase fil
 | `0g-router-openapi.json` / `.yaml`     | PHASE 04    |
 | `0g-models.json`                       | PHASE 04    |
 | `privy-node-notes.md`                  | PHASE 03    |
-| `world-*.md`                           | PHASE 10    |

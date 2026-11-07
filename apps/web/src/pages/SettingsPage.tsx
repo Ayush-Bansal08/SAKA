@@ -40,7 +40,7 @@ export function SettingsPage() {
               <Row label="Name">{user.displayName ?? '—'}</Row>
               <Row label="Identity">
                 <span className="flex flex-wrap justify-end gap-1.5">
-                  <HumanBadge>Verified human</HumanBadge>
+                  <HumanBadge>Account owner</HumanBadge>
                   {user.identityKind === 'dev' && <Badge tone="caution">DEV</Badge>}
                 </span>
               </Row>

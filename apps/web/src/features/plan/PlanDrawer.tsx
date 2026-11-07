@@ -265,9 +265,7 @@ function PlanBody({ plan }: { plan: PlanView }) {
             <dt className="text-muted-foreground">Status</dt>
             <dd className="font-medium">{plan.approval.status.toLowerCase()}</dd>
             <dt className="text-muted-foreground">Provider</dt>
-            <dd>
-              {plan.approval.providerKind === 'dev' ? 'DEV (World ID in Phase 10)' : 'World ID'}
-            </dd>
+            <dd>{plan.approval.providerKind === 'dev' ? 'DEV' : 'Passkey'}</dd>
             <dt className="text-muted-foreground">Why</dt>
             <dd className="[overflow-wrap:anywhere]">{plan.approval.reason}</dd>
             <dt className="text-muted-foreground">Expires</dt>

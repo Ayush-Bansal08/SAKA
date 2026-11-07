@@ -26,7 +26,7 @@ import { getAddress } from 'viem';
 import type { Env } from '../../config/env.js';
 import type { ZgClient } from '../ai0g/client.js';
 import { Explainer } from '../ai0g/explainer.js';
-import type { DevApprovalProvider } from '../approvals/dev-approval-provider.js';
+import type { ApprovalProvider } from '../approvals/approval-provider.js';
 import type { ApprovalsService } from '../approvals/service.js';
 import type { ChainClient } from '../execution/chain.js';
 import type { JobQueues } from '../execution/jobs.js';
@@ -52,7 +52,7 @@ export interface PipelineDeps {
   zg: ZgClient | null;
   chain: ChainClient | null;
   approvals: ApprovalsService;
-  approvalProvider: Pick<DevApprovalProvider, 'requestApproval' | 'kind'>;
+  approvalProvider: Pick<ApprovalProvider, 'requestApproval' | 'kind'>;
   jobs: JobQueues;
   now?: () => Date;
 }

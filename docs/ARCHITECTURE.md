@@ -11,7 +11,7 @@ Browser (React, Vercel)                     Telegram (P08)
    ▼
 apps/api  (Fastify 5, Node 22)
    ├─ config/env           Zod-validated env, production guard for dev providers      [P01]
-   ├─ modules/auth         IdentityProvider (Dev now → World in P10), sessions          [P01]
+   ├─ modules/auth         IdentityProvider (Dev, Passkey), sessions                    [P01]
    ├─ modules/users        one human = one agent (unique iss+sub), /me                  [P01]
    ├─ modules/trace        TraceBus: Postgres persistence + Redis pub/sub → SSE /stream [P01]
    ├─ modules/approvals    ApprovalProvider interface (workflow in a later phase)        [P01]
@@ -51,9 +51,9 @@ aliases it to `src/`. Production builds compile `shared` to `dist/` first (Turbo
   `NODE_ENV !== 'production'`. Its route, `POST /auth/dev/sign-in`, is only registered when dev
   providers are allowed.
 - **Startup guard:** `loadEnv()` refuses `AUTH_MODE=dev`, `APPROVAL_MODE=dev` or
-  `ALLOW_DEV_PROVIDERS=true` when `NODE_ENV=production`, and lists every problem. `world` modes
-  are refused until PHASE 10 implements them.
-- **Users:** `(identityIss, identitySub)` is unique. This is what enforces "one human = one agent".
+  `ALLOW_DEV_PROVIDERS=true` when `NODE_ENV=production`, and lists every problem.
+  `AUTH_MODE` and `APPROVAL_MODE` must match.
+- **Users:** `(identityIss, identitySub)` is unique. This is what enforces one agent per identity.
   First sign-in creates the user with default BALANCED `Limits`, and concurrent first sign-ins are
   race-safe (P2002 retry).
 - **Sessions:** an opaque 32-byte base64url token goes to the browser and only its sha256 is stored.
@@ -99,7 +99,7 @@ aliases it to `src/`. Production builds compile `shared` to `dist/` first (Turbo
 - pino has a single redaction list in `apps/api/src/lib/logger.ts`.
 - CORS is restricted to exactly `WEB_URL`. The global rate limit is 300/min and sign-in is
   20/min per IP (Redis-backed outside tests).
-- Secrets at rest (PKCE verifiers and device codes from P10) use AES-256-GCM with
+- Secrets at rest use AES-256-GCM with
   context-bound AAD (`apps/api/src/lib/crypto.ts`).
 
 ## Data model
@@ -181,7 +181,7 @@ FUND ─balance watcher: first native deposit─▶ DONE
 
 The profile may be re-picked during PROFILE/FUND; after DONE every change is `409
 STEP_UP_REQUIRED` (as are `PUT /settings/risk-profile`, `PUT /settings/limits`,
-`POST /wallet/withdraw`) until approvals (P05) and World ID (P10) exist.
+`POST /wallet/withdraw`) because approvals only cover trade plans so far.
 
 **Balance watcher** (worker, BullMQ `wallet` queue, every `BALANCE_POLL_MS`): per wallet, reads
 balances with MCP `get_portfolio`, compares with the Redis snapshot `balances:snapshot:<userId>`,

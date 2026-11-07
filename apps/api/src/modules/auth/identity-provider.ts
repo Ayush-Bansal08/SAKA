@@ -1,6 +1,5 @@
 /**
- * Pluggable identity (PHASE_00 §7). PHASE 01 ships the DEV provider; PHASE 10
- * adds WorldIdentityProvider (World ID Agent Pass, OIDC) behind this interface.
+ * Pluggable identity (PHASE_00 §7): the DEV provider for local work, passkeys everywhere else.
  */
 import type { ProviderKind } from '@warden/shared';
 
@@ -9,7 +8,7 @@ export interface SignInContext {
   userAgent?: string;
 }
 
-export type StartSignInResult = { redirectUrl: string } | { devForm: true };
+export type StartSignInResult = { devForm: true } | { passkey: true };
 
 /** A human identity that the provider has validated server-side. */
 export interface VerifiedIdentity {

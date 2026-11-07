@@ -16,7 +16,7 @@ x-backend: &backend
     dockerfile: apps/api/Dockerfile
   env_file: .env
   environment:
-    # Staging until World ID lands: production refuses to boot with dev providers.
+    # Staging: production refuses to boot with dev providers. See docs/DEPLOY.md to switch.
     NODE_ENV: development
     # Required: pino-pretty is a dev dependency and is not in the image.
     LOG_FORMAT: json

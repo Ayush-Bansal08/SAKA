@@ -8,6 +8,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
+import { registerPasskey, signInWithPasskey } from '@/lib/passkey';
 import { session } from '@/lib/session';
 
 export const queryKeys = {
@@ -55,6 +56,19 @@ export function useDevSignIn() {
         schema: SignInResponseSchema,
         anonymous: true,
       }),
+    onSuccess: (res) => {
+      qc.setQueryData(queryKeys.me, res.user);
+      session.set({ token: res.token, expiresAt: res.expiresAt });
+    },
+  });
+}
+
+/** `displayName` creates a new account; without it, an existing passkey signs in. */
+export function usePasskeySignIn() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (displayName?: string) =>
+      displayName ? registerPasskey(displayName) : signInWithPasskey(),
     onSuccess: (res) => {
       qc.setQueryData(queryKeys.me, res.user);
       session.set({ token: res.token, expiresAt: res.expiresAt });

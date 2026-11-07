@@ -16,7 +16,7 @@ datasource db {
 
 enum ProviderKind {
   dev
-  world
+  passkey
 }
 
 enum RiskProfile {
@@ -104,18 +104,10 @@ enum ApprovalChannel {
   TELEGRAM
 }
 
-enum IdentityPurpose {
+enum PasskeyPurpose {
+  REGISTER
   SIGN_IN
-  ENROLL
-  STEP_UP
-}
-
-enum IdentityAttemptStatus {
-  PENDING
-  SUCCEEDED
-  FAILED
-  EXPIRED
-  CANCELLED
+  APPROVE
 }
 
 enum ExecutionKind {
@@ -235,7 +227,7 @@ enum TraceKind {
 // Identity & sessions
 // ---------------------------------------------------------------------------
 
-/// One verified human = one agent: (identityIss, identitySub) is unique.
+/// One identity = one agent: (identityIss, identitySub) is unique.
 model User {
   id             String         @id @default(cuid())
   identityIss    String
@@ -262,7 +254,7 @@ model User {
   agentRequests    AgentRequest[]
   actionPlans      ActionPlan[]
   approvals        Approval[]
-  identityAttempts IdentityAttempt[]
+  passkeys         PasskeyCredential[]
   executions       Execution[]
   lpPositions      LpPosition[]
   tokenLots        TokenLot[]
@@ -292,30 +284,45 @@ model Session {
   @@index([expiresAt])
 }
 
-model IdentityAttempt {
-  id              String                @id @default(cuid())
-  userId          String?
-  approvalId      String?
-  purpose         IdentityPurpose
-  state           String                @unique
-  nonce           String
-  /// AES-256-GCM ciphertext (ENCRYPTION_KEY) — never store PKCE verifiers in clear.
-  pkceVerifierEnc String
-  deviceCodeEnc   String?
-  userCode        String?
-  verificationUri String?
-  status          IdentityAttemptStatus @default(PENDING)
-  expiresAt       DateTime
-  error           String?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+/// A WebAuthn credential. The private key never leaves the human's device.
+model PasskeyCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  /// base64url credential id, as the authenticator reports it.
+  credentialId String    @unique
+  publicKey    Bytes
+  /// Signature counter; a value that goes backwards means a cloned authenticator.
+  counter      BigInt    @default(0)
+  transports   String[]
+  deviceType   String
+  backedUp     Boolean
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  approval Approval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// A single-use WebAuthn challenge. APPROVE challenges are bound to one approval and plan hash.
+model PasskeyChallenge {
+  id          String         @id @default(cuid())
+  purpose     PasskeyPurpose
+  challenge   String         @unique
+  /// REGISTER: the new account's identitySub, fixed before the passkey exists.
+  subject     String?
+  displayName String?
+  approvalId  String?
+  planHash    String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime       @default(now())
+
+  approval Approval? @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
   @@index([approvalId])
-  @@index([status, expiresAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -484,9 +491,9 @@ model Approval {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  actionPlan       ActionPlan        @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityAttempts IdentityAttempt[]
+  actionPlan        ActionPlan         @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passkeyChallenges PasskeyChallenge[]
 
   @@index([userId, createdAt])
   @@index([status, expiresAt])

@@ -23,7 +23,7 @@ The image also has a generic entry, `node dist/main.js`, that picks the process 
    - `NODE_ENV=production`, `APP_NAME`, `WEB_URL` (the Vercel URL), `API_URL` (the api service's public URL)
    - `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `REDIS_URL=${{Redis.REDIS_URL}}`
    - `ENCRYPTION_KEY` (`openssl rand -base64 32`), `ADMIN_TOKEN` (`openssl rand -hex 32`)
-   - `EXECUTION_CHAIN_ID`, `AUTH_MODE=world`, `APPROVAL_MODE=world`, `ALLOW_DEV_PROVIDERS=false`
+   - `EXECUTION_CHAIN_ID`, `AUTH_MODE=passkey`, `APPROVAL_MODE=passkey`, `ALLOW_DEV_PROVIDERS=false`
    - PHASE 03: `PRIVY_APP_ID`, `PRIVY_APP_SECRET` (+ `PRIVY_AUTHORIZATION_PRIVATE_KEY` only if the
      Privy dashboard requires signed requests), `MCP_URL` + `MCP_AUTH_TOKEN` on **both** api and
      worker (the worker's balance watcher reads balances through MCP), optionally
@@ -41,13 +41,12 @@ The image also has a generic entry, `node dist/main.js`, that picks the process 
    `TELEGRAM_WEBHOOK_SECRET` on `api`, `worker` and `bot`. The service registers the webhook on
    `API_URL/telegram/webhook`, then exits. The worker sends all outgoing messages.
 
-> Production refuses to boot with dev identity/approval providers. Until World ID lands in
-> PHASE 10, there is no production mode to deploy (by design).
+> Production refuses to boot with dev identity/approval providers.
 
-## Staging deploy (current hosted mode, until PHASE 10)
+## Staging deploy (dev sign-in)
 
-The steps above describe the production target. Until World ID lands, the hosted app runs as
-staging. Use these values instead on `api`, `worker` and `bot`:
+The steps above describe the production target. To run as staging instead, use these values on
+`api`, `worker` and `bot`:
 
 ```env
 NODE_ENV=development

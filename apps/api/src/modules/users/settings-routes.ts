@@ -1,7 +1,7 @@
 /**
  * Settings. Reading is open to the user; every change (risk profile, limits, withdrawals) is a
- * STEP_UP action (PHASE_00 §9 rule 2) that needs a fresh World ID verification. Until the
- * approval pipeline (P05) and World (P10) exist, these endpoints answer 409 STEP_UP_REQUIRED.
+ * STEP_UP action (PHASE_00 §9 rule 2). Approvals only cover trade plans so far, so these
+ * endpoints answer 409 STEP_UP_REQUIRED.
  */
 import {
   AutoActUpdateSchema,
@@ -22,12 +22,7 @@ import { findAgentWallet, toWalletView } from '../wallet/wallet-service.js';
 import { isAtOrPast, toLimitsView } from './onboarding.js';
 
 function stepUpRequired(reason: PolicyReasonCode, what: string): AppError {
-  return new AppError(
-    'STEP_UP_REQUIRED',
-    409,
-    `${what} needs a fresh World ID verification, which arrives in Phase 10.`,
-    { reason, availableIn: 'Phase 10' },
-  );
+  return new AppError('STEP_UP_REQUIRED', 409, `${what} is not available yet.`, { reason });
 }
 
 export const settingsRoutes: FastifyPluginAsyncZod = async (app) => {

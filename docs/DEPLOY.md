@@ -8,8 +8,10 @@ The backend runs on one Azure VM with Docker Compose, and the web app runs on Ve
 | Vercel   | Web app                                                       |
 
 The hosted app runs as **staging**: `NODE_ENV=development` with dev sign-in and dev approvals.
-Production mode refuses to boot until World ID lands in PHASE 10. Dev sign-in has no password, so
-anyone who enters a name gets that account. Use testnet funds only.
+Dev sign-in has no password, so anyone who enters a name gets that account. Use testnet funds only.
+To go to production mode, set `NODE_ENV=production`, `AUTH_MODE=passkey`, `APPROVAL_MODE=passkey`
+and `ALLOW_DEV_PROVIDERS=false`. Passkeys are locked to the `WEB_URL` domain, so settle the domain
+first.
 
 The compose file is [`deploy/azure/docker-compose.yml`](../deploy/azure/docker-compose.yml). Railway
 configs are also kept in [`deploy/railway/`](../deploy/railway/README.md).

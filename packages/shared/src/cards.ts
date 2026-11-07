@@ -157,7 +157,7 @@ export const ApprovalCardSchema = z.object({
   tradeScore: z.number().int().min(0).max(100).optional(),
   status: z.enum(['PENDING', 'APPROVED', 'DENIED', 'EXPIRED', 'USED', 'REJECTED']),
   channel: z.enum(['WEB', 'TELEGRAM']),
-  providerKind: z.enum(['dev', 'world']),
+  providerKind: z.enum(['dev', 'passkey']),
   expiresAt: IsoDateTimeSchema,
   hook: PreviewCardSchema.shape.hook,
   checks: CardChecksSchema.optional(),

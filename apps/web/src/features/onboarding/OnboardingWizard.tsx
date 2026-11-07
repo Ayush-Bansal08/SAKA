@@ -1,5 +1,5 @@
 /**
- * Full-screen onboarding (PHASE 03 §5): Verified human → Agent wallet → Risk profile → Fund.
+ * Full-screen onboarding (PHASE 03 §5): Signed in → Agent wallet → Risk profile → Fund.
  * The server owns the state machine (GET /onboarding); this view only decides which screen to
  * show and keeps the freshly created address on screen before moving on.
  */
@@ -51,7 +51,7 @@ import { cn } from '@/lib/utils';
 type View = 'verify' | 'wallet' | 'profile' | 'fund' | 'done';
 
 const STEPS: { view: Exclude<View, 'done'>; label: string; icon: ReactNode }[] = [
-  { view: 'verify', label: 'Verified human', icon: <Fingerprint /> },
+  { view: 'verify', label: 'Signed in', icon: <Fingerprint /> },
   { view: 'wallet', label: 'Agent wallet', icon: <Wallet /> },
   { view: 'profile', label: 'Risk profile', icon: <Gauge /> },
   { view: 'fund', label: 'Fund', icon: <Droplets /> },
@@ -244,7 +244,7 @@ function WizardSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Verified human
+// 1. Signed in
 // ---------------------------------------------------------------------------
 
 function VerifyStep({ isDev, onContinue }: { isDev: boolean; onContinue: () => void }) {
@@ -253,16 +253,16 @@ function VerifyStep({ isDev, onContinue }: { isDev: boolean; onContinue: () => v
       <StepHeader
         tone="human"
         icon={<ShieldCheck />}
-        title="You're a verified human"
-        description="One human gets one agent. Your agent can only act within the limits you set, and anything bigger waits for you."
+        title="You're signed in"
+        description="Your agent can only act within the limits you set, and anything bigger waits for you."
       />
       <div className="mt-5 flex flex-wrap justify-center gap-2">
-        <HumanBadge>Verified human</HumanBadge>
+        <HumanBadge>Account owner</HumanBadge>
         {isDev && <Badge tone="caution">DEV</Badge>}
       </div>
       {isDev && (
         <p className="mt-3 text-center text-xs text-caution">
-          World ID verification arrives in Phase 10. You signed in with a DEV identity.
+          You signed in with a DEV identity, for local testing only.
         </p>
       )}
       <Button size="lg" className="mt-7 w-full sm:w-auto" onClick={onContinue} autoFocus>
@@ -377,9 +377,7 @@ function AddressCard({
       <div className="min-w-0 flex-1 text-center sm:text-left">
         <div className="text-xs font-medium text-muted-foreground">Agent wallet · {chain.name}</div>
         <div className="mt-1.5 flex items-center justify-center gap-1 sm:justify-start">
-          <code className="font-mono text-sm break-all text-foreground sm:text-sm">
-            {address}
-          </code>
+          <code className="font-mono text-sm break-all text-foreground sm:text-sm">{address}</code>
           <CopyButton value={address} label="Copy wallet address" className="size-7 shrink-0" />
         </div>
         <a

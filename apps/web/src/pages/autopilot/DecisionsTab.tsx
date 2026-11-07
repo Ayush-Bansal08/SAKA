@@ -1,6 +1,6 @@
 /**
  * Decisions: everything waiting for the human. Pending approvals come first with live expiry,
- * Approve (dev until Phase 10) / Reject and Details → plan drawer. Then the morning brief and the
+ * Approve / Reject and Details → plan drawer. Then the morning brief and the
  * Mode B suggestions, newest first, with Yes / Change / No (PHASE 08 §3).
  */
 import type { PendingApproval } from '@warden/shared';
@@ -56,6 +56,15 @@ function ApprovalRow({ a, devApprove }: { a: PendingApproval; devApprove: boolea
             onClick={() => action.mutate({ kind: 'dev-approve', approvalId: a.id })}
           >
             <Fingerprint aria-hidden /> Approve (dev)
+          </Button>
+        )}
+        {a.providerKind === 'passkey' && left > 0 && (
+          <Button
+            size="sm"
+            disabled={action.isPending}
+            onClick={() => action.mutate({ kind: 'passkey-approve', approvalId: a.id })}
+          >
+            <Fingerprint aria-hidden /> Approve with passkey
           </Button>
         )}
         <Button
@@ -115,7 +124,7 @@ function Approvals() {
       )}
       {pending.data?.devApproveAvailable && items.length > 0 && (
         <p className="border-t border-border px-5 py-2 text-xs text-caution">
-          Approve (dev) — World ID step-up replaces this in Phase 10.
+          Approve (dev) is for local testing only.
         </p>
       )}
     </Panel>

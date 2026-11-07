@@ -229,8 +229,13 @@ export function ApprovalCardView({ card }: { card: ApprovalCard }) {
                 <Fingerprint aria-hidden /> Approve (dev)
               </Button>
             ) : (
-              <Button disabled>
-                <Globe aria-hidden /> Approve with World ID
+              <Button
+                disabled={action.isPending}
+                onClick={() =>
+                  action.mutate({ kind: 'passkey-approve', approvalId: card.approvalId })
+                }
+              >
+                <Fingerprint aria-hidden /> Approve with passkey
               </Button>
             )}
             <Button
@@ -242,9 +247,7 @@ export function ApprovalCardView({ card }: { card: ApprovalCard }) {
             </Button>
           </div>
           {card.providerKind === 'dev' && (
-            <p className="text-xs text-caution">
-              Approve (dev) — World ID step-up replaces this in Phase 10.
-            </p>
+            <p className="text-xs text-caution">Approve (dev) is for local testing only.</p>
           )}
         </div>
       )}
@@ -322,7 +325,7 @@ export function ReceiptCardView({ card }: { card: ReceiptCard }) {
       badge={
         card.approvedBy === 'HUMAN' ? (
           <Badge tone="human" icon={<Globe aria-hidden />}>
-            Verified human
+            Approved by you
           </Badge>
         ) : (
           <Badge tone="agent" icon={<Bot aria-hidden />}>
@@ -343,8 +346,7 @@ export function ReceiptCardView({ card }: { card: ReceiptCard }) {
         <p className="text-lg font-semibold tabular-nums">{usd(card.amountUsd)}</p>
       )}
       <p className="text-xs text-muted-foreground">
-        Approved by {card.approvedBy === 'HUMAN' ? 'you (verified human)' : 'your agent'} ·{' '}
-        {usd(card.amountUsd)}
+        Approved by {card.approvedBy === 'HUMAN' ? 'you' : 'your agent'} · {usd(card.amountUsd)}
         {card.completedAt && (
           <>
             {' · '}

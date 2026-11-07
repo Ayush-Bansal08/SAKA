@@ -68,9 +68,26 @@ describe('env validation', () => {
     expect(issues[0]).toMatch(/requires ALLOW_DEV_PROVIDERS=true/);
   });
 
-  it('refuses world mode until Phase 10', () => {
+  it('refuses an unknown identity mode', () => {
     const issues = issuesOf(() => loadEnv(testEnvSource({ AUTH_MODE: 'world' })));
-    expect(issues[0]).toMatch(/Phase 10/);
+    expect(issues.join(' ')).toMatch(/AUTH_MODE/);
+  });
+
+  it('refuses mismatched identity and approval modes', () => {
+    const issues = issuesOf(() => loadEnv(testEnvSource({ AUTH_MODE: 'passkey' })));
+    expect(issues).toContain('AUTH_MODE and APPROVAL_MODE must match');
+  });
+
+  it('accepts passkeys in production with dev providers off', () => {
+    const env = loadEnv(
+      testEnvSource({
+        NODE_ENV: 'production',
+        AUTH_MODE: 'passkey',
+        APPROVAL_MODE: 'passkey',
+        ALLOW_DEV_PROVIDERS: 'false',
+      }),
+    );
+    expect(env.AUTH_MODE).toBe('passkey');
   });
 });
 
@@ -78,7 +95,7 @@ describe('production startup guard', () => {
   it('reports the dev-provider refusal even when other variables are missing', () => {
     const issues = issuesOf(() => loadEnv({ NODE_ENV: 'production', AUTH_MODE: 'dev' }));
     expect(issues[0]).toBe(
-      'AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=world)',
+      'AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=passkey)',
     );
     expect(issues).toContain('DATABASE_URL is required but missing');
   });
@@ -94,10 +111,10 @@ describe('production startup guard', () => {
       ),
     );
     expect(issues).toContain(
-      'AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=world)',
+      'AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=passkey)',
     );
     expect(issues).toContain(
-      'APPROVAL_MODE=dev is forbidden when NODE_ENV=production (use APPROVAL_MODE=world)',
+      'APPROVAL_MODE=dev is forbidden when NODE_ENV=production (use APPROVAL_MODE=passkey)',
     );
   });
 

@@ -218,7 +218,7 @@ export function plansToCsv(rows: readonly PlanListItem[]): string {
       TYPE_LABEL[r.type] ?? r.type,
       r.amountUsd,
       OUTCOME_META[r.outcome].label,
-      r.approvedBy === 'HUMAN' ? 'Verified human' : r.approvedBy === 'AGENT' ? 'Agent' : '',
+      r.approvedBy === 'HUMAN' ? 'You' : r.approvedBy === 'AGENT' ? 'Agent' : '',
       r.tradeScore,
       r.tx?.hash ?? null,
       r.tx?.explorerUrl ?? null,

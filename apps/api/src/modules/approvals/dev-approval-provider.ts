@@ -3,8 +3,7 @@
  * ALLOW_DEV_PROVIDERS=true and NODE_ENV≠production (env validation + the factory both check).
  * The human taps "Approve (DEV)" in the web app; evidence is `providerKind='dev'`,
  * `approvedByIss='dev'`, `approvedBySub=<the signed-in human's sub>`. The service rejects
- * evidence whose sub is not the account owner, so the "wrong human" path exists before World.
- * World ID step-up (PHASE 10) replaces this with a fresh OIDC authentication.
+ * evidence whose sub is not the account owner. Passkey approvals replace this outside local work.
  */
 import type { User } from '@prisma/client';
 import { devProvidersAllowed, type Env } from '../../config/env.js';
@@ -13,6 +12,7 @@ import type {
   ApprovalRequestChannel,
   ApprovalRequestView,
 } from './approval-provider.js';
+import { PasskeyApprovalProvider } from './passkey-approval-provider.js';
 import type { ApprovalsService, ResolveResult } from './service.js';
 
 export const DEV_APPROVAL_ISSUER = 'dev';
@@ -58,7 +58,7 @@ export function createApprovalProvider(
   env: Env,
   approvals: ApprovalsService,
   lookup: (approvalId: string) => Promise<{ expiresAt: Date } | null>,
-): DevApprovalProvider {
+): DevApprovalProvider | PasskeyApprovalProvider {
   if (env.APPROVAL_MODE === 'dev') {
     if (!devProvidersAllowed(env))
       throw new Error(
@@ -66,5 +66,5 @@ export function createApprovalProvider(
       );
     return new DevApprovalProvider(env, approvals, lookup);
   }
-  throw new Error('APPROVAL_MODE=world is implemented in Phase 10 (World ID step-up)');
+  return new PasskeyApprovalProvider(env, lookup);
 }

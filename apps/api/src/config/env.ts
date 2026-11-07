@@ -30,7 +30,7 @@ const encryptionKey = z
     { message: 'must be 32 random bytes, base64-encoded (generate: openssl rand -base64 32)' },
   );
 
-const providerMode = z.enum(['dev', 'world']);
+const providerMode = z.enum(['dev', 'passkey']);
 
 export const AllowlistEntrySchema = z.object({
   chainId: z.number().int().positive(),
@@ -87,6 +87,8 @@ export const EnvSchema = z.object({
   HOST: z.string().min(1).default('0.0.0.0'),
   APP_NAME: z.string().trim().min(1).max(40).default('SAKA'),
   WEB_URL: urlWithoutTrailingSlash,
+  /** Passkeys are locked to this domain. Defaults to the WEB_URL hostname. */
+  WEBAUTHN_RP_ID: z.string().min(1).optional(),
   API_URL: urlWithoutTrailingSlash,
   DATABASE_URL: z
     .string()
@@ -112,8 +114,8 @@ export const EnvSchema = z.object({
     .transform((v) => v as ExecutionChainId),
 
   // --- modes ----------------------------------------------------------------
-  AUTH_MODE: providerMode.default('world'),
-  APPROVAL_MODE: providerMode.default('world'),
+  AUTH_MODE: providerMode.default('passkey'),
+  APPROVAL_MODE: providerMode.default('passkey'),
   ALLOW_DEV_PROVIDERS: booleanString.default('false'),
   /** Demo market simulator: its button and its routes exist only when this is on. */
   ENABLE_DEMO_SIMULATOR: booleanString.default('false'),
@@ -228,10 +230,10 @@ function validateModes(env: ModeEnv): string[] {
   const issues: string[] = [];
   if (env.NODE_ENV === 'production') {
     if (env.AUTH_MODE === 'dev')
-      issues.push('AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=world)');
+      issues.push('AUTH_MODE=dev is forbidden when NODE_ENV=production (use AUTH_MODE=passkey)');
     if (env.APPROVAL_MODE === 'dev')
       issues.push(
-        'APPROVAL_MODE=dev is forbidden when NODE_ENV=production (use APPROVAL_MODE=world)',
+        'APPROVAL_MODE=dev is forbidden when NODE_ENV=production (use APPROVAL_MODE=passkey)',
       );
     if (env.ALLOW_DEV_PROVIDERS)
       issues.push('ALLOW_DEV_PROVIDERS=true is forbidden when NODE_ENV=production');
@@ -243,13 +245,9 @@ function validateModes(env: ModeEnv): string[] {
       );
     }
   }
-  if (env.AUTH_MODE === 'world' || env.APPROVAL_MODE === 'world') {
-    // World ID Agent Pass is implemented in PHASE 10; until then refuse to boot
-    // in a mode that would leave sign-in or approvals without a provider.
-    issues.push(
-      'AUTH_MODE/APPROVAL_MODE=world is not available yet (World ID arrives in Phase 10); ' +
-        'use dev providers in development',
-    );
+  if (env.AUTH_MODE !== env.APPROVAL_MODE) {
+    // An approval must come from the same kind of identity as the account owner.
+    issues.push('AUTH_MODE and APPROVAL_MODE must match');
   }
   return issues;
 }

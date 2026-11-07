@@ -21,7 +21,7 @@ import {
 import { ActionIntentSchema } from './intent.js';
 import { TraceEventSchema, ZgProvenanceSchema } from './trace.js';
 
-export const PROVIDER_KINDS = ['dev', 'world'] as const;
+export const PROVIDER_KINDS = ['dev', 'passkey'] as const;
 export const ProviderKindSchema = z.enum(PROVIDER_KINDS);
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
 
@@ -65,6 +65,21 @@ export type UserView = z.infer<typeof UserViewSchema>;
 
 export const MeResponseSchema = z.object({ user: UserViewSchema });
 export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+/** WebAuthn JSON travels as-is: the server library validates it, not this schema. */
+const WebAuthnJsonSchema = z.record(z.string(), z.unknown());
+
+export const PasskeyOptionsResponseSchema = z.object({
+  challengeId: z.string().min(1),
+  options: WebAuthnJsonSchema,
+});
+export type PasskeyOptionsResponse = z.infer<typeof PasskeyOptionsResponseSchema>;
+
+export const PasskeyVerifyRequestSchema = z.object({
+  challengeId: z.string().min(1).max(100),
+  response: WebAuthnJsonSchema,
+});
+export type PasskeyVerifyRequest = z.infer<typeof PasskeyVerifyRequestSchema>;
 
 export const DisplayNameSchema = z
   .string()

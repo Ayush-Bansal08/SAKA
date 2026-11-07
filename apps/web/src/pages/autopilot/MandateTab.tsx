@@ -1,6 +1,6 @@
 /**
  * Mandate: what the agent may do alone. Profile and limit changes need a fresh human check, so
- * they stay disabled until World ID step-up exists. The auto-act switches and rules are live.
+ * they stay disabled until approvals cover settings changes. The auto-act switches and rules are live.
  */
 import {
   RISK_PROFILES,

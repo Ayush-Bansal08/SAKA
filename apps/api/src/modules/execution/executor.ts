@@ -53,7 +53,7 @@ import { patchPlanCards, postPlanMessage, setPreviewStatus } from '../agent/card
 import { describeIntent } from '../agent/describe.js';
 import { inferenceRefs } from '../agent/plan-view.js';
 import type { StoredSteps } from '../agent/preparer.js';
-import type { DevApprovalProvider } from '../approvals/dev-approval-provider.js';
+import type { ApprovalProvider } from '../approvals/approval-provider.js';
 import { reasonText, type ApprovalsService } from '../approvals/service.js';
 import type { McpCallContext, UniswapMcpClient } from '../mcp/client.js';
 import type { TraceBus } from '../trace/trace-bus.js';
@@ -71,7 +71,7 @@ export interface ExecutorDeps {
   traceBus: Pick<TraceBus, 'emit'>;
   jobs: JobQueues;
   approvals: ApprovalsService;
-  approvalProvider: Pick<DevApprovalProvider, 'requestApproval' | 'kind'>;
+  approvalProvider: Pick<ApprovalProvider, 'requestApproval' | 'kind'>;
   /** Called once a run ended (Mode B: receipts, suggestion status). Never fails the job. */
   onPlanSettled?: (planId: string, outcome: ExecuteOutcome) => Promise<void>;
   now?: () => Date;

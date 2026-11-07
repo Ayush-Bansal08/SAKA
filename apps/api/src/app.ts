@@ -20,7 +20,9 @@ import { registerErrorHandling } from './lib/error-handler.js';
 import { createPrisma, createRedis } from './lib/infra.js';
 import { loggerOptions } from './lib/logger.js';
 import type { IdentityProvider } from './modules/auth/identity-provider.js';
+import { PasskeyService } from './modules/auth/passkey-service.js';
 import { createIdentityProvider } from './modules/auth/providers.js';
+import type { PasskeyApprovalProvider } from './modules/approvals/passkey-approval-provider.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { SessionService } from './modules/auth/session-service.js';
 import { healthRoutes } from './modules/health/routes.js';
@@ -75,7 +77,8 @@ export interface AppDeps {
   /** Outgoing Telegram work (a no-op without a bot token). */
   notifications: Notifications;
   approvals: ApprovalsService;
-  approvalProvider: DevApprovalProvider;
+  approvalProvider: DevApprovalProvider | PasskeyApprovalProvider;
+  passkeys: PasskeyService;
   log: FastifyBaseLogger;
 }
 
@@ -109,10 +112,11 @@ const REQUEST_ID_RE = /^[A-Za-z0-9._:-]{8,128}$/;
 
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
   const { env } = options;
-  // Fail before opening connections if the identity configuration is invalid.
-  const identity = createIdentityProvider(env);
-
   const prisma = createPrisma(env.DATABASE_URL);
+  const passkeys = new PasskeyService(prisma, env);
+  // Fail before opening connections if the identity configuration is invalid.
+  const identity = createIdentityProvider(env, passkeys);
+
   const redis = createRedis(env.REDIS_URL, { name: 'api' });
   const sessions = new SessionService(prisma, env.SESSION_TTL_HOURS);
 
@@ -178,6 +182,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     notifications,
     approvals,
     approvalProvider,
+    passkeys,
     log,
   });
   app.decorateRequest('auth', null);

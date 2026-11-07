@@ -3,9 +3,9 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { SimpleTooltip } from '@/components/ui/tooltip';
 
-const STEP_UP_TOOLTIP = 'Needs World ID (coming in Phase 10)';
+const STEP_UP_TOOLTIP = 'Not available yet';
 
-/** Present but disabled until approvals (P05) and World ID step-up (P10) exist. */
+/** Present but disabled until approvals cover settings changes. */
 export function StepUpButton({
   children,
   icon,

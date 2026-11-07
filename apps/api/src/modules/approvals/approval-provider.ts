@@ -1,6 +1,6 @@
 /**
- * Pluggable human approvals (PHASE_00 §7). The approvals workflow lands in a
- * later phase (DevApprovalProvider), and World ID step-up in PHASE 10.
+ * Pluggable human approvals (PHASE_00 §7): DevApprovalProvider for local work,
+ * PasskeyApprovalProvider everywhere else.
  */
 import type { ProviderKind } from '@warden/shared';
 
@@ -11,10 +11,8 @@ export interface ApprovalRequestView {
   providerKind: ProviderKind;
   channel: ApprovalRequestChannel;
   expiresAt: Date;
-  /** Where the human completes the approval (web URL / World verification URI). */
+  /** Where the human completes the approval (web URL). */
   verificationUrl?: string;
-  /** Short code shown to the human for device-flow approvals (Telegram). */
-  userCode?: string;
 }
 
 export interface ApprovalProvider {

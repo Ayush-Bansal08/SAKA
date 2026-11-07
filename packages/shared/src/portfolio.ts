@@ -210,7 +210,7 @@ export type PortfolioResponse = z.infer<typeof PortfolioResponseSchema>;
 export const PORTFOLIO_PRICE_SOURCE = 'Uniswap API · Ethereum mainnet reference';
 
 // ---------------------------------------------------------------------------
-// Settings (changes need World ID step-up — PHASE 10)
+// Settings (changes aren't available yet: approvals only cover trade plans)
 // ---------------------------------------------------------------------------
 
 export const SettingsResponseSchema = z.object({

@@ -79,6 +79,14 @@ export function ApprovalPage() {
                     <Fingerprint aria-hidden /> Approve (dev)
                   </Button>
                 )}
+                {a.providerKind === 'passkey' && (
+                  <Button
+                    disabled={action.isPending}
+                    onClick={() => action.mutate({ kind: 'passkey-approve', approvalId: a.id })}
+                  >
+                    <Fingerprint aria-hidden /> Approve with passkey
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   disabled={action.isPending}
@@ -101,9 +109,7 @@ export function ApprovalPage() {
               </p>
             )}
             {a.providerKind === 'dev' && (
-              <p className="text-[12px] text-caution">
-                Approve (dev) — World ID step-up replaces this in Phase 10.
-              </p>
+              <p className="text-[12px] text-caution">Approve (dev) is for local testing only.</p>
             )}
           </div>
         ) : null}

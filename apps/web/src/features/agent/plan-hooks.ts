@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { api, ApiError } from '@/lib/api';
+import { approveWithPasskey, passkeyErrorMessage } from '@/lib/passkey';
 import { agentKeys } from './hooks';
 
 /** Valid cards of a message (unknown legacy shapes are skipped). */
@@ -37,9 +38,12 @@ type PlanAction =
   | { kind: 'cancel'; planId: string }
   | { kind: 'repreview'; planId: string }
   | { kind: 'deny'; approvalId: string }
-  | { kind: 'dev-approve'; approvalId: string };
+  | { kind: 'dev-approve'; approvalId: string }
+  | { kind: 'passkey-approve'; approvalId: string };
 
-const path = (a: PlanAction) =>
+type ServerAction = Exclude<PlanAction, { kind: 'passkey-approve' }>;
+
+const path = (a: ServerAction) =>
   a.kind === 'cancel'
     ? `/plans/${a.planId}/cancel`
     : a.kind === 'repreview'
@@ -51,24 +55,29 @@ const SUCCESS: Record<PlanAction['kind'], string> = {
   repreview: 'Fresh preview ready.',
   deny: 'Denied — nothing was traded.',
   'dev-approve': 'Approved — your agent is executing it.',
+  'passkey-approve': 'Approved — your agent is executing it.',
 };
 
 export function usePlanAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (action: PlanAction) =>
-      api(path(action), { method: 'POST', body: {}, schema: z.unknown() }),
+      action.kind === 'passkey-approve'
+        ? approveWithPasskey(action.approvalId)
+        : api(path(action), { method: 'POST', body: {}, schema: z.unknown() }),
     onSuccess: (_data, action) => {
       toast.success(SUCCESS[action.kind]);
     },
-    onError: (err) => {
-      toast.error(
-        err instanceof ApiError ? err.message : 'That did not go through. Please try again.',
-      );
+    onError: (err, action) => {
+      if (action.kind === 'passkey-approve') toast.error(passkeyErrorMessage(err));
+      else
+        toast.error(
+          err instanceof ApiError ? err.message : 'That did not go through. Please try again.',
+        );
     },
     onSettled: (_d, _e, action) => {
       void qc.invalidateQueries({ queryKey: agentKeys.messages });
-      if (action.kind === 'deny' || action.kind === 'dev-approve')
+      if ('approvalId' in action)
         void qc.invalidateQueries({ queryKey: ['approval', action.approvalId] });
     },
   });

@@ -49,7 +49,7 @@ Screenshots use mock data. More are in [`docs/ui-revamp/screenshots/after/`](doc
 | Autopilot detectors, Telegram alerts, Market Event Simulator               | ✅ done                                        |
 | SAKA interface                                                             | ✅ done                                        |
 | Hosted staging (Azure VM + Vercel), see [`docs/DEPLOY.md`](docs/DEPLOY.md) | ✅ done                                        |
-| World ID sign-in and step-up approvals                                     | 🚧 not yet: a labelled dev identity runs today |
+| Passkey sign-in and trade approvals                                        | ✅ done, not yet switched on in hosted staging |
 
 SAKA was first called Warden, so package names (`@warden/*`), the database and older docs still use
 that name.
@@ -173,7 +173,6 @@ Routes: `GET /plans/:id`, `POST /plans/:id/cancel`, `POST /plans/:id/repreview`,
 - **Privy:** agent wallets are app-controlled server wallets with a per-wallet policy that only
   allows Uniswap contracts, Permit2 and allowlisted tokens. Every Privy call is in
   [`apps/api/src/modules/wallet/privy.ts`](apps/api/src/modules/wallet/privy.ts).
-- **World:** World ID Agent Pass for sign-in and step-up approvals is planned, not built yet.
 
 ## AI layer (0G)
 
@@ -240,10 +239,19 @@ wait in Autopilot and on Telegram with Yes / Change / No, and "Yes" re-quotes be
 
 ## Identity
 
-Until World ID lands, sign-in uses a clearly labelled **DEV identity provider** behind the
-`IdentityProvider` interface: the same name always signs in as the same human, which models "one
-human = one agent". An amber banner stays visible while it is active. The API **refuses to start**
-if dev providers are configured with `NODE_ENV=production`.
+Sign-in and trade approvals use **passkeys** (`AUTH_MODE=passkey`, `APPROVAL_MODE=passkey`). There
+is no password: the private key stays on the person's device, and every use needs their
+fingerprint, face or PIN. An approval signs a single-use challenge tied to that approval and its
+plan hash, so it can't be reused for another action. See
+[`passkey-service.ts`](apps/api/src/modules/auth/passkey-service.ts).
+
+A passkey proves someone controls a device, not that they are a unique person, so one person can
+create several accounts. Changing limits, changing the risk profile and withdrawals aren't
+available yet, because approvals only cover trade plans so far.
+
+For local work, a clearly labelled **DEV identity provider** signs in by name. An amber banner stays
+visible while it is active, and the API **refuses to start** if dev providers are configured with
+`NODE_ENV=production`.
 
 ## Scripts
 
